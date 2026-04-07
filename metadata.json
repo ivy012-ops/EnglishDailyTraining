@@ -1,0 +1,5 @@
+{
+  "name": "Speaking Practice AI",
+  "description": "An AI-powered conversation practice app designed for intermediate English learners to overcome speaking anxiety with real-life scenarios and honest feedback.",
+  "requestFramePermissions": ["microphone"]
+}
