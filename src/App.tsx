@@ -16,7 +16,8 @@ import {
   TrendingUp, 
   MessageSquare,
   Award,
-  Volume2
+  Volume2,
+  RefreshCw
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 import { FALLBACK_SCENARIOS, FALLBACK_TOPICS, FALLBACK_VOCAB } from './data/fallbacks';
@@ -327,90 +328,90 @@ function Onboarding({ onComplete }: { onComplete: (level: ProficiencyLevel) => v
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
-      className="max-w-2xl mx-auto pt-20 px-6 text-center"
+      className="max-w-2xl mx-auto pt-16 md:pt-24 px-6 text-center"
     >
       <AnimatePresence mode="wait">
         {step === 'welcome' && (
-          <motion.div key="welcome" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-8">
-              <Mic size={32} />
+          <motion.div key="welcome" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}>
+            <div className="w-20 h-20 bg-brand-50 text-brand-600 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-sm">
+              <Mic size={36} />
             </div>
-            <h1 className="text-3xl font-bold tracking-tight mb-4">IELTS Speaking Assessment</h1>
-            <p className="text-slate-600 text-lg mb-12">Test your level with a quick 3-question speaking check using IELTS criteria.</p>
+            <h1 className="text-4xl font-display font-black tracking-tight mb-4 text-slate-900">IELTS Speaking Check</h1>
+            <p className="text-slate-500 text-lg mb-12 leading-relaxed">Let's find your starting point. Answer 3 quick questions to get your IELTS-based level.</p>
             <button 
               onClick={() => setStep('testing')}
-              className="bg-indigo-600 text-white px-8 py-4 rounded-xl font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center gap-2 mx-auto"
+              className="bg-brand-600 text-white px-10 py-4 rounded-2xl font-bold shadow-xl shadow-brand-100 hover:bg-brand-700 hover:scale-105 transition-all flex items-center gap-2 mx-auto"
             >
-              Start Speaking Test <ChevronRight size={20} />
+              Start Assessment <ChevronRight size={20} />
             </button>
           </motion.div>
         )}
 
         {step === 'testing' && (
-          <motion.div key="testing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-8">
-            <div className="flex justify-center gap-2 mb-4">
-              {questions.map((_, i) => (
-                <div key={i} className={`h-1.5 w-12 rounded-full transition-colors ${i <= currentQuestionIndex ? 'bg-indigo-600' : 'bg-slate-200'}`} />
-              ))}
+          <motion.div key="testing" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-10">
+            <div className="space-y-2">
+              <div className="flex justify-center gap-2">
+                {questions.map((_, i) => (
+                  <div key={i} className={`h-1.5 rounded-full transition-all ${i === currentQuestionIndex ? 'w-8 bg-brand-600' : 'w-2 bg-slate-200'}`} />
+                ))}
+              </div>
+              <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Question {currentQuestionIndex + 1} of 3</p>
             </div>
-            <h2 className="text-2xl font-bold text-slate-800">{questions[currentQuestionIndex]}</h2>
-            
-            <div className="relative group">
-              <div className={`w-full p-8 bg-white border-2 rounded-3xl min-h-[200px] flex flex-col items-center justify-center transition-all ${isListening ? 'border-red-500 shadow-lg shadow-red-50' : 'border-slate-200'}`}>
-                {userInput ? (
-                  <p className="text-lg text-slate-700 text-left w-full leading-relaxed">{userInput}</p>
-                ) : (
-                  <p className="text-slate-400 italic">Click the mic and start speaking...</p>
-                )}
-                
-                {isListening && (
-                  <div className="absolute bottom-4 flex gap-1">
-                    {[1, 2, 3].map(i => (
+
+            <div className="p-10 bg-white border border-slate-100 rounded-[3rem] shadow-sm relative">
+              <h2 className="text-2xl font-display font-bold text-slate-900 leading-tight mb-8">"{questions[currentQuestionIndex]}"</h2>
+              
+              <div className="relative h-32 flex items-center justify-center">
+                {isListening ? (
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map(i => (
                       <motion.div
                         key={i}
-                        animate={{ height: [8, 20, 8] }}
-                        transition={{ repeat: Infinity, duration: 0.6, delay: i * 0.1 }}
-                        className="w-1 bg-red-500 rounded-full"
+                        animate={{ height: [10, 40, 10] }}
+                        transition={{ repeat: Infinity, duration: 0.5, delay: i * 0.1 }}
+                        className="w-1 bg-brand-500 rounded-full"
                       />
                     ))}
                   </div>
+                ) : (
+                  <p className="text-slate-400 text-sm italic">Tap the mic and start speaking...</p>
                 )}
               </div>
               
               <button 
                 onClick={toggleListening}
-                className={`absolute -bottom-6 left-1/2 -translate-x-1/2 w-16 h-16 rounded-full flex items-center justify-center shadow-xl transition-all ${isListening ? 'bg-red-500 hover:bg-red-600' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+                className={`absolute -bottom-8 left-1/2 -translate-x-1/2 w-20 h-20 rounded-[2rem] flex items-center justify-center shadow-2xl transition-all ${isListening ? 'bg-red-500 hover:bg-red-600 scale-110' : 'bg-brand-600 hover:bg-brand-700 hover:scale-105'}`}
               >
-                {isListening ? <MicOff className="text-white" /> : <Mic className="text-white" />}
+                {isListening ? <MicOff size={32} className="text-white" /> : <Mic size={32} className="text-white" />}
               </button>
             </div>
 
-            <div className="pt-8">
+            <div className="pt-12">
               <button 
                 onClick={handleNext}
                 disabled={isProcessing || !userInput.trim()}
-                className="bg-indigo-600 text-white px-8 py-4 rounded-xl font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:bg-slate-300 transition-all flex items-center gap-2 mx-auto"
+                className="bg-slate-900 text-white px-10 py-4 rounded-2xl font-bold shadow-xl shadow-slate-100 hover:bg-slate-800 disabled:bg-slate-200 transition-all flex items-center gap-2 mx-auto"
               >
-                {isProcessing ? "Analyzing..." : currentQuestionIndex === questions.length - 1 ? "Finish Check" : "Next Question"} <ChevronRight size={20} />
+                {isProcessing ? "Analyzing..." : currentQuestionIndex === questions.length - 1 ? "Finish Assessment" : "Next Question"} <ChevronRight size={20} />
               </button>
             </div>
           </motion.div>
         )}
 
         {step === 'result' && (
-          <motion.div key="result" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-8">
-              <Award size={40} />
+          <motion.div key="result" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}>
+            <div className="w-24 h-24 bg-emerald-50 text-emerald-600 rounded-[2.5rem] flex items-center justify-center mx-auto mb-8 shadow-sm">
+              <Award size={48} />
             </div>
-            <h1 className="text-3xl font-bold tracking-tight mb-4">Test Complete!</h1>
-            <p className="text-slate-600 text-lg mb-2">Your IELTS-based Level:</p>
-            <div className="text-5xl font-black text-indigo-600 mb-8">{detectedLevel}</div>
-            <p className="text-slate-500 mb-12 max-w-md mx-auto">
-              Based on IELTS Speaking Assessment Criteria, you are currently at the {detectedLevel} tier.
+            <h1 className="text-4xl font-display font-black tracking-tight mb-4 text-slate-900">Assessment Complete!</h1>
+            <p className="text-slate-500 text-lg mb-2">Your current IELTS-based level is:</p>
+            <div className="text-7xl font-display font-black text-brand-600 mb-8">{detectedLevel}</div>
+            <p className="text-slate-500 mb-12 max-w-md mx-auto leading-relaxed">
+              Great job! We've tailored your practice sessions to match your <strong>{detectedLevel}</strong> proficiency level.
             </p>
             <button 
               onClick={() => onComplete(detectedLevel)}
-              className="bg-indigo-600 text-white px-12 py-4 rounded-xl font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all mx-auto"
+              className="bg-brand-600 text-white px-14 py-4 rounded-2xl font-bold shadow-xl shadow-brand-100 hover:bg-brand-700 hover:scale-105 transition-all mx-auto"
             >
               Start Practicing
             </button>
@@ -434,87 +435,87 @@ function ScenarioSelection({ userLevel, onSelect, onDailyPractice, onDailyVocab,
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="max-w-5xl mx-auto pt-12 px-6"
+      className="max-w-5xl mx-auto pt-12 pb-24 px-6"
     >
-      <header className="mb-12">
-        <div className="flex items-center gap-2 text-indigo-600 font-bold text-sm uppercase tracking-widest mb-2">
-          <TrendingUp size={16} /> Level {userLevel}
+      <header className="mb-12 flex items-end justify-between">
+        <div>
+          <div className="flex items-center gap-2 text-brand-600 font-black text-[10px] uppercase tracking-[0.2em] mb-3">
+            <TrendingUp size={14} /> Level {userLevel}
+          </div>
+          <h1 className="text-5xl font-display font-black tracking-tighter text-slate-900">Practice Hub</h1>
+          <p className="text-slate-500 mt-2 text-lg">Master real-life English situations.</p>
         </div>
-        <h1 className="text-4xl font-bold tracking-tight">Choose a Scenario</h1>
-        <p className="text-slate-500 mt-2">Practice real-life situations designed for your level.</p>
       </header>
 
       {/* Daily Practice Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
         <motion.button
-          whileHover={{ scale: 1.02 }}
+          whileHover={{ y: -5, scale: 1.01 }}
           whileTap={{ scale: 0.98 }}
           onClick={onDailyPractice}
-          className="p-8 bg-gradient-to-br from-indigo-600 to-violet-700 rounded-[2rem] text-white text-left relative overflow-hidden group shadow-xl shadow-indigo-100"
+          className="p-8 bg-brand-600 rounded-[2.5rem] text-white text-left relative overflow-hidden group shadow-2xl shadow-brand-100"
         >
           <div className="relative z-10">
-            <div className="flex items-center gap-2 text-indigo-200 font-bold text-[10px] uppercase tracking-widest mb-4">
+            <div className="flex items-center gap-2 text-brand-200 font-black text-[10px] uppercase tracking-widest mb-4">
               <Mic size={14} /> Warm-up
             </div>
-            <h2 className="text-2xl font-bold mb-2">Impromptu Speech</h2>
-            <p className="text-indigo-100/70 text-sm">Master thinking on your feet with 1-minute random topics.</p>
-            <div className="mt-6 flex items-center gap-2 font-bold text-xs group-hover:gap-4 transition-all">
-              Start <ChevronRight size={14} />
+            <h2 className="text-3xl font-display font-bold mb-2">Impromptu Speech</h2>
+            <p className="text-brand-100/80 text-sm leading-relaxed max-w-[80%]">Master thinking on your feet with 90-second random topics.</p>
+            <div className="mt-8 flex items-center gap-2 font-black text-xs uppercase tracking-widest group-hover:gap-4 transition-all">
+              Start Session <ChevronRight size={14} />
             </div>
           </div>
-          <div className="absolute right-[-10px] bottom-[-10px] opacity-10 group-hover:opacity-20 transition-opacity">
-            <Mic size={120} />
+          <div className="absolute right-[-20px] bottom-[-20px] opacity-10 group-hover:opacity-20 group-hover:scale-110 transition-all duration-500">
+            <Mic size={160} />
           </div>
         </motion.button>
 
         <motion.button
-          whileHover={{ scale: 1.02 }}
+          whileHover={{ y: -5, scale: 1.01 }}
           whileTap={{ scale: 0.98 }}
           onClick={onDailyVocab}
-          className="p-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-[2rem] text-white text-left relative overflow-hidden group shadow-xl shadow-emerald-100"
+          className="p-8 bg-emerald-600 rounded-[2.5rem] text-white text-left relative overflow-hidden group shadow-2xl shadow-emerald-100"
         >
           <div className="relative z-10">
-            <div className="flex items-center gap-2 text-emerald-100 font-bold text-[10px] uppercase tracking-widest mb-4">
+            <div className="flex items-center gap-2 text-emerald-100 font-black text-[10px] uppercase tracking-widest mb-4">
               <BookOpen size={14} /> Vocabulary
             </div>
-            <h2 className="text-2xl font-bold mb-2">Word Builder</h2>
-            <p className="text-emerald-50/70 text-sm">Learn 5 new words daily tailored to your level.</p>
-            <div className="mt-6 flex items-center gap-2 font-bold text-xs group-hover:gap-4 transition-all">
-              Start <ChevronRight size={14} />
+            <h2 className="text-3xl font-display font-bold mb-2">Word Builder</h2>
+            <p className="text-emerald-50/80 text-sm leading-relaxed max-w-[80%]">Learn 3 high-impact words daily tailored to your level.</p>
+            <div className="mt-8 flex items-center gap-2 font-black text-xs uppercase tracking-widest group-hover:gap-4 transition-all">
+              Start Session <ChevronRight size={14} />
             </div>
           </div>
-          <div className="absolute right-[-10px] bottom-[-10px] opacity-10 group-hover:opacity-20 transition-opacity">
-            <BookOpen size={120} />
+          <div className="absolute right-[-20px] bottom-[-20px] opacity-10 group-hover:opacity-20 group-hover:scale-110 transition-all duration-500">
+            <BookOpen size={160} />
           </div>
         </motion.button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
-        {scenarios.map((s) => (
-          <button 
-            key={s.id}
-            onClick={() => onSelect(s.id)}
-            className="group p-6 bg-white border border-slate-200 rounded-3xl text-left hover:border-indigo-600 hover:shadow-xl hover:shadow-indigo-50 transition-all"
-          >
-            <div className="w-12 h-12 bg-slate-50 text-slate-600 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
-              {s.icon}
-            </div>
-            <h3 className="text-xl font-bold mb-2">{s.title}</h3>
-            <p className="text-slate-500 text-sm leading-relaxed">{s.description}</p>
-            <div className="mt-6 flex items-center text-indigo-600 font-bold text-xs uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
-              Start Practice <ChevronRight size={14} />
-            </div>
-          </button>
-        ))}
-      </div>
-
-      <div className="flex justify-center pb-12">
-        <button 
-          onClick={onSettings}
-          className="flex items-center gap-2 text-slate-400 hover:text-indigo-600 font-bold text-xs uppercase tracking-widest transition-colors"
-        >
-          <Settings size={16} /> Account Settings
-        </button>
+      <div className="space-y-6">
+        <h3 className="text-[10px] text-slate-400 uppercase font-black tracking-[0.3em] pl-2">Real-life Scenarios</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {scenarios.map((s) => (
+            <motion.button 
+              key={s.id}
+              whileHover={{ x: 5 }}
+              onClick={() => onSelect(s.id)}
+              className="group p-6 bg-white border border-slate-100 rounded-[2rem] text-left hover:border-brand-500 hover:shadow-xl hover:shadow-brand-50 transition-all flex items-center gap-6"
+            >
+              <div className="w-16 h-16 bg-slate-50 text-slate-400 rounded-2xl flex items-center justify-center group-hover:bg-brand-50 group-hover:text-brand-600 transition-all shrink-0">
+                {React.cloneElement(s.icon as React.ReactElement, { size: 28 })}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-1">
+                  <h4 className="font-display font-bold text-slate-900 group-hover:text-brand-600 transition-colors">{s.title}</h4>
+                  <span className="text-[10px] font-black bg-slate-100 text-slate-500 px-2 py-0.5 rounded uppercase tracking-tighter">{s.level}</span>
+                </div>
+                <p className="text-slate-500 text-xs line-clamp-1">{s.description}</p>
+              </div>
+              <ChevronRight size={20} className="text-slate-300 group-hover:text-brand-500 group-hover:translate-x-1 transition-all" />
+            </motion.button>
+          ))}
+        </div>
       </div>
     </motion.div>
   );
@@ -528,6 +529,10 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
   const [timeLeft, setTimeLeft] = useState(300); // 5 minutes in seconds
   const [isFinished, setIsFinished] = useState(false);
   const [subTopic, setSubTopic] = useState("");
+  const [context, setContext] = useState("");
+  const [openingLine, setOpeningLine] = useState("");
+  const [hasStarted, setHasStarted] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const recognitionRef = useRef<any>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -535,7 +540,7 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
 
   // Timer logic
   useEffect(() => {
-    if (timeLeft > 0 && !isFinished) {
+    if (hasStarted && timeLeft > 0 && !isFinished) {
       timerRef.current = setInterval(() => {
         setTimeLeft(prev => prev - 1);
       }, 1000);
@@ -546,46 +551,53 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [timeLeft, isFinished]);
+  }, [timeLeft, isFinished, hasStarted]);
 
   // Dynamic Topic Generation
   useEffect(() => {
     const initConversation = async () => {
       setIsProcessing(true);
       try {
-        const model = "gemini-3-flash-preview";
-        const prompt = `Generate a random, specific sub-topic and a creative opening line for an English speaking practice session.
+        const prompt = `Generate a random, specific sub-topic, a creative opening line, and a short 1-sentence context description for an English speaking practice session.
         Scenario: ${scenarioId}
         Learner Level: ${userLevel}
         
         The opening line should be natural and put the user in the situation immediately.
+        The context should describe the setting or the user's role (e.g. 'You are at a busy cafe in London trying to order a special drink.').
         
         Return ONLY a JSON object:
         {
-          "subTopic": "A specific focus (e.g. 'Discussing a bug in the login flow')",
-          "openingLine": "The first thing the AI says to the user."
+          "subTopic": "A specific focus (e.g. 'Ordering at a London Cafe')",
+          "openingLine": "The first thing the AI says to the user.",
+          "context": "A short 1-sentence description of the situation."
         }`;
 
         const response = await ai.models.generateContent({
-          model,
+          model: "gemini-3-flash-preview",
           contents: prompt,
           config: { responseMimeType: "application/json" }
         });
 
-        const result = JSON.parse(response.text || "{}");
-        setSubTopic(result.subTopic || "General Practice");
-        setMessages([{ role: 'ai', text: result.openingLine || "Hello! Let's start our practice." }]);
+        const data = JSON.parse(response.text || "{}");
+        setSubTopic(data.subTopic || "General Practice");
+        setContext(data.context || "Practice your English in this real-life scenario.");
+        setOpeningLine(data.openingLine || "Hello! Let's start our practice.");
+        setMessages([]); // Clear messages for new topic
+        setHasStarted(false); // Reset start state
       } catch (error) {
         console.error("Topic Gen Error:", error);
         const fallback = scenarioId ? FALLBACK_SCENARIOS[scenarioId] : null;
         setSubTopic(fallback?.subTopic || "General Practice");
-        setMessages([{ role: 'ai', text: fallback?.openingLine || "Hi! Let's start our practice session." }]);
+        setContext("Practice your English in this real-life scenario.");
+        setOpeningLine(fallback?.openingLine || "Hi! Let's start our practice session.");
+        setMessages([]);
+        setHasStarted(false);
       } finally {
         setIsProcessing(false);
       }
     };
     initConversation();
-  }, [scenarioId, userLevel]);
+  }, [scenarioId, userLevel, refreshKey]);
 
   useEffect(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -636,12 +648,15 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
     }
   };
 
+  const handleStart = () => {
+    setHasStarted(true);
+    setMessages([{ role: 'ai', text: openingLine }]);
+  };
+
   const getFeedbackAndResponse = async (text: string) => {
     if (isFinished) return;
     setIsProcessing(true);
     try {
-      const model = "gemini-3-flash-preview";
-      
       const history = messages.map(m => `${m.role.toUpperCase()}: ${m.text}`).join('\n');
       
       const prompt = `
@@ -674,26 +689,24 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
       `;
 
       const response = await ai.models.generateContent({
-        model,
+        model: "gemini-3-flash-preview",
         contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-        }
+        config: { responseMimeType: "application/json" }
       });
 
-      const result = JSON.parse(response.text || "{}");
+      const data = JSON.parse(response.text || "{}");
       
       const feedback = {
         original: text,
-        improved: result.improved,
-        explanation: result.explanation,
-        score: result.score_estimate
+        improved: data.improved,
+        explanation: data.explanation,
+        score: data.score_estimate
       };
 
       setMessages(prev => [
         ...prev, 
         { role: 'user', text, feedback },
-        { role: 'ai', text: result.next_turn }
+        { role: 'ai', text: data.next_turn }
       ]);
       setUserInput("");
     } catch (error) {
@@ -723,51 +736,186 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
   };
 
   return (
-    <div className="h-screen flex flex-col bg-white">
-      <header className="p-4 border-b border-slate-100 flex items-center justify-between">
-        <button onClick={onBack} className="text-slate-400 hover:text-slate-600">
+    <div className="h-screen flex flex-col bg-slate-50">
+      <header className="p-4 bg-white border-b border-slate-200 flex items-center justify-between sticky top-0 z-10">
+        <button onClick={onBack} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">
           <ChevronRight size={24} className="rotate-180" />
         </button>
-        <div className="text-center">
-          <h2 className="font-bold text-sm">{subTopic || "Loading scenario..."}</h2>
-          <p className="text-[10px] text-slate-400 uppercase tracking-widest">Level {userLevel} • {formatTime(timeLeft)} left</p>
+        <div className="text-center flex-1 px-4">
+          <AnimatePresence mode="wait">
+            {isProcessing && messages.length <= 1 ? (
+              <motion.div
+                key="loading-topic"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex items-center justify-center gap-2"
+              >
+                <RefreshCw size={12} className="animate-spin text-brand-500" />
+                <span className="text-[10px] text-slate-400 uppercase tracking-widest font-bold animate-pulse">Generating...</span>
+              </motion.div>
+            ) : (
+              <motion.div
+                key={subTopic}
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -5 }}
+              >
+                <h2 className="font-bold text-xs text-slate-400 uppercase tracking-widest mb-0.5">Scenario Practice</h2>
+                <p className="text-[10px] text-slate-400 font-medium">Level {userLevel} • {formatTime(timeLeft)} left</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
-        <div className={`w-10 h-10 rounded-full border-4 flex items-center justify-center text-[10px] font-bold ${timeLeft < 60 ? 'border-red-500 text-red-500 animate-pulse' : 'border-indigo-100 text-indigo-600'}`}>
-          {Math.ceil(timeLeft / 60)}m
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => setRefreshKey(prev => prev + 1)}
+            disabled={isProcessing || messages.length > 1}
+            className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all disabled:opacity-0"
+            title="Regenerate Topic"
+          >
+            <RefreshCw size={20} className={isProcessing ? 'animate-spin' : ''} />
+          </button>
+          <div className={`w-10 h-10 rounded-xl border-2 flex items-center justify-center text-xs font-bold transition-colors ${timeLeft < 60 ? 'border-red-500 text-red-500 animate-pulse' : 'border-indigo-100 text-indigo-600 bg-indigo-50'}`}>
+            {Math.ceil(timeLeft / 60)}m
+          </div>
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-8">
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
+        <AnimatePresence mode="wait">
+          {isProcessing && messages.length === 0 ? (
+            <motion.div 
+              key="loading-briefing"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="max-w-2xl mx-auto mb-8"
+            >
+              <div className="bg-white border border-slate-100 rounded-[2.5rem] p-12 shadow-sm flex flex-col items-center justify-center text-center space-y-4">
+                <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center">
+                  <RefreshCw size={32} className="animate-spin text-brand-500" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900">Curating your scenario...</h3>
+                  <p className="text-slate-400 text-sm">Preparing a custom mission for your level.</p>
+                </div>
+              </div>
+            </motion.div>
+          ) : subTopic && !hasStarted ? (
+            <motion.div 
+              key={subTopic}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="max-w-2xl mx-auto mb-8"
+            >
+              <div className="bg-white border border-slate-200 rounded-[2.5rem] p-8 shadow-sm overflow-hidden relative">
+                <div className="absolute top-0 right-0 p-12 opacity-[0.03] -rotate-12">
+                  <MessageSquare size={160} />
+                </div>
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-2 text-brand-600 font-bold text-[10px] uppercase tracking-[0.2em]">
+                      <BookOpen size={14} /> Mission Briefing
+                    </div>
+                    <button 
+                      onClick={() => setRefreshKey(prev => prev + 1)}
+                      disabled={isProcessing}
+                      className="flex items-center gap-2 text-[10px] font-bold text-slate-400 hover:text-brand-600 transition-colors uppercase tracking-widest disabled:opacity-50"
+                    >
+                      <RefreshCw size={12} className={isProcessing ? 'animate-spin' : ''} /> New Topic
+                    </button>
+                  </div>
+                  
+                  <h3 className="text-3xl font-display font-black text-slate-900 mb-4 leading-tight">{subTopic}</h3>
+                  <p className="text-slate-500 text-lg leading-relaxed max-w-xl mb-8">{context}</p>
+                  
+                  <div className="flex flex-col sm:flex-row items-center gap-4 mb-8">
+                    <button 
+                      onClick={handleStart}
+                      className="w-full sm:w-auto bg-brand-600 text-white px-10 py-4 rounded-2xl font-bold shadow-lg shadow-brand-100 hover:bg-brand-700 transition-all flex items-center justify-center gap-2 group"
+                    >
+                      Start Practice
+                      <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                    </button>
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" />
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">AI Tutor Active</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.4)]" />
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">IELTS {userLevel} Focus</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-6 border-t border-slate-100">
+                    <p className="text-[10px] text-slate-400 font-medium italic">
+                      Tip: Take a moment to think about what you want to say before starting.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          ) : subTopic && hasStarted ? (
+            <motion.div 
+              key="active-briefing"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="max-w-2xl mx-auto mb-8"
+            >
+              <div className="bg-white/50 border border-slate-100 rounded-3xl p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-brand-50 rounded-xl flex items-center justify-center text-brand-600">
+                    <BookOpen size={20} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-900">{subTopic}</h4>
+                    <p className="text-[10px] text-slate-400 font-medium truncate max-w-[200px]">{context}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-bold uppercase tracking-wider">
+                    Level {userLevel}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+
         {messages.map((m, i) => (
-          <div key={i} className="space-y-4">
+          <div key={i} className="space-y-3">
             <div className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[80%] p-4 rounded-2xl ${m.role === 'user' ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-slate-100 text-slate-800 rounded-tl-none'}`}>
-                {m.text}
+              <div className={`max-w-[85%] p-4 rounded-2xl shadow-sm ${m.role === 'user' ? 'bg-brand-600 text-white rounded-tr-none' : 'bg-white text-slate-800 rounded-tl-none border border-slate-100'}`}>
+                <p className="leading-relaxed">{m.text}</p>
               </div>
             </div>
             
             {m.feedback && (
               <motion.div 
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="p-6 bg-amber-50 border border-amber-100 rounded-3xl max-w-[90%] ml-auto"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-5 bg-amber-50/50 border border-amber-100 rounded-2xl max-w-[90%] ml-auto shadow-sm"
               >
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2 text-amber-700 font-bold text-xs uppercase tracking-widest">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2 text-amber-700 font-bold text-[10px] uppercase tracking-wider">
                     <Award size={14} /> IELTS Feedback
                   </div>
-                  <div className="bg-amber-200 text-amber-900 px-2 py-1 rounded text-[10px] font-black">
-                    SCORE: {m.feedback.score}
+                  <div className="bg-amber-200 text-amber-900 px-2 py-0.5 rounded text-[10px] font-black">
+                    {m.feedback.score}
                   </div>
                 </div>
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <div>
-                    <p className="text-[10px] text-emerald-600 uppercase font-bold mb-1">Fluent Version</p>
-                    <p className="text-slate-900 font-medium">"{m.feedback.improved}"</p>
+                    <p className="text-[9px] text-emerald-600 uppercase font-black mb-1 tracking-tighter">Fluent Version</p>
+                    <p className="text-slate-900 font-medium text-sm italic">"{m.feedback.improved}"</p>
                   </div>
                   <div>
-                    <p className="text-[10px] text-indigo-600 uppercase font-bold mb-1">Why it's different</p>
-                    <p className="text-slate-600 text-sm">{m.feedback.explanation}</p>
+                    <p className="text-[9px] text-indigo-600 uppercase font-black mb-1 tracking-tighter">Analysis</p>
+                    <p className="text-slate-600 text-xs leading-relaxed">{m.feedback.explanation}</p>
                   </div>
                 </div>
               </motion.div>
@@ -777,8 +925,15 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
         
         {isProcessing && (
           <div className="flex justify-start">
-            <div className="bg-slate-100 p-4 rounded-2xl rounded-tl-none animate-pulse text-slate-400">
-              {messages.length === 0 ? "Preparing your scenario..." : "Analyzing speech..."}
+            <div className="bg-white border border-slate-100 p-4 rounded-2xl rounded-tl-none shadow-sm flex items-center gap-3">
+              <div className="flex gap-1">
+                <motion.div animate={{ scale: [1, 1.5, 1] }} transition={{ repeat: Infinity, duration: 1 }} className="w-1.5 h-1.5 bg-indigo-400 rounded-full" />
+                <motion.div animate={{ scale: [1, 1.5, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-1.5 h-1.5 bg-indigo-400 rounded-full" />
+                <motion.div animate={{ scale: [1, 1.5, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-1.5 h-1.5 bg-indigo-400 rounded-full" />
+              </div>
+              <span className="text-xs text-slate-400 font-medium">
+                {messages.length === 0 ? "Preparing scenario..." : "Analyzing speech..."}
+              </span>
             </div>
           </div>
         )}
@@ -804,16 +959,16 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
         )}
       </div>
 
-      <footer className="p-6 border-t border-slate-100 bg-slate-50/50">
-        <div className="flex gap-4 items-center">
+      <footer className={`p-4 md:p-6 border-t border-slate-200 bg-white sticky bottom-0 transition-all duration-500 ${hasStarted ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'}`}>
+        <div className="flex gap-3 items-center max-w-4xl mx-auto">
           <div className="flex-1 relative">
             <input 
               type="text"
               value={userInput}
               onChange={(e) => setUserInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-              placeholder={isFinished ? "Session ended" : isListening ? "Listening..." : "Tap mic to speak..."}
-              className={`w-full p-4 bg-white border rounded-2xl focus:outline-none transition-all ${isListening ? 'border-red-500 ring-2 ring-red-50' : 'border-slate-200 focus:border-indigo-600'}`}
+              placeholder={isFinished ? "Session ended" : isListening ? "Listening..." : "Type or use mic..."}
+              className={`w-full p-4 bg-slate-50 border rounded-2xl focus:outline-none transition-all text-sm ${isListening ? 'border-red-500 ring-4 ring-red-50' : 'border-slate-200 focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-50'}`}
               disabled={isProcessing || isFinished}
             />
             {isListening && (
@@ -833,17 +988,17 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
           <button 
             onClick={toggleListening}
             disabled={isProcessing || isFinished}
-            className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-lg ${isListening ? 'bg-red-500 shadow-red-100' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100'} ${isFinished ? 'opacity-50 cursor-not-allowed' : ''}`}
+            className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center transition-all shadow-lg ${isListening ? 'bg-red-500 shadow-red-100 scale-110' : 'bg-brand-600 hover:bg-brand-700 shadow-brand-100'} ${isFinished ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            {isListening ? <MicOff className="text-white" /> : <Mic className="text-white" />}
+            {isListening ? <MicOff size={20} className="text-white" /> : <Mic size={20} className="text-white" />}
           </button>
           
           <button 
             onClick={handleSend}
             disabled={isProcessing || !userInput.trim() || isFinished}
-            className="w-14 h-14 bg-slate-800 text-white rounded-2xl flex items-center justify-center hover:bg-slate-900 disabled:bg-slate-300 transition-all shadow-lg shadow-slate-100"
+            className="w-12 h-12 md:w-14 md:h-14 bg-slate-900 text-white rounded-2xl flex items-center justify-center hover:bg-slate-800 disabled:bg-slate-200 transition-all shadow-lg shadow-slate-100"
           >
-            <ChevronRight size={24} />
+            <ChevronRight size={20} />
           </button>
         </div>
       </footer>
@@ -861,6 +1016,7 @@ function DailyPractice({ userLevel, onBack, onComplete }: { userLevel: Proficien
   const [isListening, setIsListening] = useState(false);
   const [userInput, setUserInput] = useState("");
   const [feedback, setFeedback] = useState<any>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   
   const recognitionRef = useRef<any>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -868,6 +1024,7 @@ function DailyPractice({ userLevel, onBack, onComplete }: { userLevel: Proficien
 
   const generatePractice = async () => {
     setIsProcessing(true);
+    setRefreshKey(prev => prev + 1);
     try {
       const prompt = `Generate a random impromptu speech topic and 3 extremely short, clean, actionable tips (max 10 words each).
       
@@ -883,9 +1040,9 @@ function DailyPractice({ userLevel, onBack, onComplete }: { userLevel: Proficien
         config: { responseMimeType: "application/json" }
       });
 
-      const result = JSON.parse(response.text || "{}");
-      setTopic(result.topic || "General Topic");
-      setTips(result.tips || ["Focus on clarity", "Structure your points", "Keep a steady pace"]);
+      const data = JSON.parse(response.text || "{}");
+      setTopic(data.topic || "General Topic");
+      setTips(data.tips || ["Focus on clarity", "Structure your points", "Keep a steady pace"]);
       setStep('practice');
     } catch (error) {
       console.error("Daily Practice Gen Error:", error);
@@ -1043,28 +1200,63 @@ function DailyPractice({ userLevel, onBack, onComplete }: { userLevel: Proficien
 
         {step === 'practice' && (
           <div className="max-w-2xl mx-auto space-y-8">
-            <div className="text-center space-y-2">
-              <div className={`text-4xl font-black ${timeLeft < 20 ? 'text-red-500 animate-pulse' : 'text-indigo-600'}`}>
-                {formatTime(timeLeft)}
+            <div className="flex items-center justify-between">
+              <div className="w-10" />
+              <div className="text-center space-y-1">
+                <div className={`text-4xl font-display font-black ${timeLeft < 20 ? 'text-red-500 animate-pulse' : 'text-brand-600'}`}>
+                  {formatTime(timeLeft)}
+                </div>
+                <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Time Remaining</p>
               </div>
-              <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">Time Remaining</p>
+              <button 
+                onClick={generatePractice}
+                disabled={isProcessing || timerActive}
+                className="p-3 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-2xl transition-all disabled:opacity-0"
+                title="Regenerate Topic"
+              >
+                <RefreshCw size={20} className={isProcessing ? 'animate-spin' : ''} />
+              </button>
             </div>
 
-            <div className="p-8 bg-slate-50 rounded-[2rem] border border-slate-100">
-              <p className="text-[10px] text-indigo-600 uppercase font-bold mb-2">Your Topic</p>
-              <h3 className="text-2xl font-bold text-slate-900 leading-tight">{topic}</h3>
-            </div>
-
-            <div className="space-y-4">
-              <p className="text-[10px] text-slate-400 uppercase font-bold text-center">Speech Tips</p>
-              <div className="flex flex-wrap justify-center gap-3">
-                {tips.map((tip, i) => (
-                  <div key={i} className="px-4 py-2 bg-white border border-slate-100 rounded-full shadow-sm text-xs font-medium text-slate-600">
-                    {tip}
+            <AnimatePresence mode="wait">
+              {isProcessing ? (
+                <motion.div
+                  key="loading"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="flex flex-col items-center justify-center py-20 space-y-4"
+                >
+                  <RefreshCw size={40} className="text-brand-500 animate-spin" />
+                  <p className="text-slate-400 font-display font-bold animate-pulse">Generating new topic...</p>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key={refreshKey}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="space-y-8"
+                >
+                  <div className="p-8 bg-white rounded-[2.5rem] border border-slate-100 shadow-sm relative overflow-hidden group">
+                    <div className="absolute top-0 left-0 w-2 h-full bg-brand-500" />
+                    <p className="text-[10px] text-brand-600 uppercase font-black mb-2 tracking-wider">Your Topic</p>
+                    <h3 className="text-2xl font-display font-bold text-slate-900 leading-tight">{topic}</h3>
                   </div>
-                ))}
-              </div>
-            </div>
+
+                  <div className="space-y-4">
+                    <p className="text-[10px] text-slate-400 uppercase font-bold text-center">Speech Tips</p>
+                    <div className="flex flex-wrap justify-center gap-3">
+                      {tips.map((tip, i) => (
+                        <div key={i} className="px-4 py-2 bg-white border border-slate-100 rounded-full shadow-sm text-xs font-medium text-slate-600">
+                          {tip}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <div className="pt-8 text-center">
               {!timerActive && timeLeft === 90 ? (
@@ -1165,51 +1357,70 @@ function DailyPractice({ userLevel, onBack, onComplete }: { userLevel: Proficien
   );
 }
 function SettingsView({ profile, onBack, onReset }: { profile: UserProfile, onBack: () => void, onReset: () => void, key?: string }) {
+  const [showConfirmReset, setShowConfirmReset] = useState(false);
+
   return (
     <motion.div 
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -20 }}
-      className="max-w-2xl mx-auto pt-12 px-6"
+      className="max-w-2xl mx-auto pt-12 pb-24 px-6"
     >
       <header className="mb-12 flex items-center justify-between">
         <div>
-          <h1 className="text-4xl font-bold tracking-tight">Settings</h1>
-          <p className="text-slate-500 mt-2">Manage your account and preferences.</p>
+          <h1 className="text-5xl font-display font-black tracking-tighter text-slate-900">Settings</h1>
+          <p className="text-slate-500 mt-2 text-lg">Manage your account and preferences.</p>
         </div>
-        <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
-          <ChevronRight size={24} className="rotate-180" />
+        <button onClick={onBack} className="p-3 hover:bg-slate-100 rounded-2xl transition-all">
+          <ChevronRight size={24} className="rotate-180 text-slate-400" />
         </button>
       </header>
 
       <div className="space-y-6">
-        <div className="p-6 bg-white border border-slate-100 rounded-3xl shadow-sm">
-          <h3 className="text-lg font-bold mb-4">Profile Information</h3>
+        <div className="p-8 bg-white border border-slate-100 rounded-[2.5rem] shadow-sm">
+          <h3 className="text-lg font-display font-bold mb-6 text-slate-900">Profile Information</h3>
           <div className="space-y-4">
-            <div className="flex justify-between items-center py-2 border-b border-slate-50">
-              <span className="text-slate-500 text-sm">Current Level</span>
-              <span className="font-bold text-indigo-600">{profile.level || 'Not Set'}</span>
+            <div className="flex justify-between items-center py-3 border-b border-slate-50">
+              <span className="text-slate-500 text-sm font-medium">Current Level</span>
+              <span className="font-black text-brand-600 uppercase tracking-widest text-xs bg-brand-50 px-3 py-1 rounded-full">{profile.level || 'Not Set'}</span>
             </div>
-            <div className="flex justify-between items-center py-2 border-b border-slate-50">
-              <span className="text-slate-500 text-sm">Sessions Completed</span>
-              <span className="font-bold">{profile.sessionsCompleted}</span>
+            <div className="flex justify-between items-center py-3 border-b border-slate-50">
+              <span className="text-slate-500 text-sm font-medium">Sessions Completed</span>
+              <span className="font-display font-bold text-slate-900">{profile.sessionsCompleted}</span>
             </div>
           </div>
         </div>
 
-        <div className="p-6 bg-white border border-slate-100 rounded-3xl shadow-sm">
-          <h3 className="text-lg font-bold mb-4 text-red-600">Danger Zone</h3>
-          <p className="text-slate-500 text-sm mb-6">Resetting your profile will delete all your progress and stats. This cannot be undone.</p>
-          <button 
-            onClick={() => {
-              if (confirm("Are you sure you want to reset your profile? This will delete all your progress.")) {
-                onReset();
-              }
-            }}
-            className="w-full py-4 bg-red-50 text-red-600 rounded-2xl font-bold hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
-          >
-            <History size={18} /> Reset Profile & Retake Test
-          </button>
+        <div className="p-8 bg-white border border-slate-100 rounded-[2.5rem] shadow-sm">
+          <h3 className="text-lg font-display font-bold mb-4 text-red-600">Danger Zone</h3>
+          <p className="text-slate-500 text-sm mb-8 leading-relaxed">Resetting your profile will delete all your progress and stats. This cannot be undone.</p>
+          
+          {showConfirmReset ? (
+            <div className="space-y-4">
+              <p className="text-sm font-bold text-slate-900 text-center">Are you absolutely sure?</p>
+              <div className="grid grid-cols-2 gap-4">
+                <button 
+                  onClick={() => setShowConfirmReset(false)}
+                  className="py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={onReset}
+                  className="py-4 bg-red-600 text-white rounded-2xl font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-100"
+                >
+                  Yes, Reset
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button 
+              onClick={() => setShowConfirmReset(true)}
+              className="w-full py-4 bg-red-50 text-red-600 rounded-2xl font-bold hover:bg-red-100 transition-all flex items-center justify-center gap-2"
+            >
+              <History size={18} /> Reset Profile & Retake Test
+            </button>
+          )}
         </div>
       </div>
     </motion.div>
@@ -1226,6 +1437,7 @@ function DailyVocab({ userLevel, onBack, onComplete }: { userLevel: ProficiencyL
   const [isListening, setIsListening] = useState(false);
   const [userInput, setUserInput] = useState("");
   const [feedback, setFeedback] = useState<any>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   
   const recognitionRef = useRef<any>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -1233,8 +1445,9 @@ function DailyVocab({ userLevel, onBack, onComplete }: { userLevel: ProficiencyL
 
   const generateVocab = async () => {
     setIsProcessing(true);
+    setRefreshKey(prev => prev + 1);
     try {
-      const prompt = `Generate 3 level-appropriate (Level ${userLevel}) vocabulary words and a short "Practice Challenge" prompt that encourages the user to use these words in a few sentences.
+      const prompt = `Generate 3 NEW and DIFFERENT level-appropriate (Level ${userLevel}) vocabulary words and a short "Practice Challenge" prompt that encourages the user to use these words in a few sentences.
       
       Return ONLY a JSON object:
       {
@@ -1252,9 +1465,9 @@ function DailyVocab({ userLevel, onBack, onComplete }: { userLevel: ProficiencyL
         config: { responseMimeType: "application/json" }
       });
 
-      const result = JSON.parse(response.text || "{}");
-      setVocab(result.vocab || []);
-      setChallenge(result.challenge || "Practice using these words in a few sentences.");
+      const data = JSON.parse(response.text || "{}");
+      setVocab(data.vocab || []);
+      setChallenge(data.challenge || "Practice using these words in a few sentences.");
       setStep('practice');
     } catch (error) {
       console.error("Vocab Gen Error:", error);
@@ -1413,34 +1626,74 @@ function DailyVocab({ userLevel, onBack, onComplete }: { userLevel: ProficiencyL
 
         {step === 'practice' && (
           <div className="max-w-2xl mx-auto space-y-8">
-            <div className="text-center space-y-2">
-              <div className={`text-4xl font-black ${timeLeft < 20 ? 'text-red-500 animate-pulse' : 'text-emerald-600'}`}>
-                {formatTime(timeLeft)}
+            <div className="flex items-center justify-between">
+              <div className="w-10" />
+              <div className="text-center space-y-1">
+                <div className={`text-4xl font-display font-black ${timeLeft < 20 ? 'text-red-500 animate-pulse' : 'text-emerald-600'}`}>
+                  {formatTime(timeLeft)}
+                </div>
+                <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Time Remaining</p>
               </div>
-              <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">Time Remaining</p>
+              <button 
+                onClick={generateVocab}
+                disabled={isProcessing || timerActive}
+                className="p-3 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-2xl transition-all disabled:opacity-0"
+                title="Regenerate Words"
+              >
+                <RefreshCw size={20} className={isProcessing ? 'animate-spin' : ''} />
+              </button>
             </div>
 
-            <div className="p-8 bg-emerald-900 text-white rounded-[2.5rem] relative overflow-hidden shadow-xl shadow-emerald-100">
-              <div className="relative z-10">
-                <p className="text-[10px] text-emerald-300 uppercase font-bold mb-2 tracking-widest">The Challenge</p>
-                <h4 className="text-xl font-bold leading-tight">{challenge}</h4>
-              </div>
-              <div className="absolute right-[-20px] bottom-[-20px] opacity-10">
-                <BookOpen size={160} />
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <p className="text-[10px] text-slate-400 uppercase font-bold text-center">Target Words</p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {vocab.map((v, i) => (
-                  <div key={i} className="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
-                    <p className="font-bold text-emerald-600 text-sm">{v.word}</p>
-                    <p className="text-[10px] text-slate-500 mt-1">{v.meaning}</p>
+            <AnimatePresence mode="wait">
+              {isProcessing ? (
+                <motion.div
+                  key="loading-vocab"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="flex flex-col items-center justify-center py-20 space-y-4"
+                >
+                  <RefreshCw size={40} className="text-emerald-500 animate-spin" />
+                  <p className="text-slate-400 font-display font-bold animate-pulse">Curating new words...</p>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key={refreshKey}
+                  initial={{ opacity: 0, scale: 0.98 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 1.02 }}
+                  className="space-y-8"
+                >
+                  <div className="p-8 bg-emerald-900 text-white rounded-[2.5rem] relative overflow-hidden shadow-xl shadow-emerald-100">
+                    <div className="relative z-10">
+                      <p className="text-[10px] text-emerald-300 uppercase font-bold mb-2 tracking-widest">The Challenge</p>
+                      <h4 className="text-xl font-display font-bold leading-tight">{challenge}</h4>
+                    </div>
+                    <div className="absolute right-[-20px] bottom-[-20px] opacity-10">
+                      <BookOpen size={160} />
+                    </div>
                   </div>
-                ))}
-              </div>
-            </div>
+
+                  <div className="space-y-4">
+                    <p className="text-[10px] text-slate-400 uppercase font-black text-center tracking-widest">Target Words</p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {vocab.map((v, i) => (
+                        <motion.div 
+                          key={v.word}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: i * 0.1 }}
+                          className="p-5 bg-white border border-slate-100 rounded-3xl shadow-sm"
+                        >
+                          <p className="font-display font-bold text-emerald-600 text-sm mb-1">{v.word}</p>
+                          <p className="text-[10px] text-slate-500 leading-relaxed">{v.meaning}</p>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <div className="pt-8 text-center">
               {!timerActive && timeLeft === 90 ? (
@@ -1537,59 +1790,67 @@ function DailyVocab({ userLevel, onBack, onComplete }: { userLevel: ProficiencyL
 
 function Dashboard({ profile, onReset }: { profile: UserProfile, onReset: () => void, key?: string }) {
   const stats = [
-    { label: 'Avg Latency', value: `${profile.averageLatency.toFixed(1)}s`, trend: 'Live', icon: <TrendingUp className="text-emerald-500" /> },
-    { label: 'Filler Words', value: profile.fillerWordFrequency.toFixed(1), trend: 'Live', icon: <MessageSquare className="text-indigo-500" /> },
-    { label: 'Sessions', value: profile.sessionsCompleted.toString(), trend: 'Total', icon: <BookOpen className="text-amber-500" /> },
-    { label: 'Level', value: profile.level || 'N/A', trend: 'Current', icon: <Award className="text-purple-500" /> },
+    { label: 'Sessions', value: profile.sessionsCompleted, icon: <History className="text-brand-500" />, sub: 'Total completed' },
+    { label: 'Latency', value: `${profile.averageLatency.toFixed(1)}s`, icon: <TrendingUp className="text-emerald-500" />, sub: 'Avg. response time' },
+    { label: 'Fillers', value: `${profile.fillerWordFrequency.toFixed(1)}%`, icon: <MessageSquare className="text-amber-500" />, sub: 'Filler word rate' },
   ];
 
   return (
     <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="max-w-5xl mx-auto pt-12 px-6"
+      initial={{ opacity: 0, scale: 0.98 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.98 }}
+      className="max-w-5xl mx-auto pt-12 pb-24 px-6"
     >
       <header className="mb-12">
-        <h1 className="text-4xl font-bold tracking-tight">Your Fluency</h1>
-        <p className="text-slate-500 mt-2">Concrete evidence of your improvement over time.</p>
+        <h1 className="text-5xl font-display font-black tracking-tighter text-slate-900">Your Progress</h1>
+        <p className="text-slate-500 mt-2 text-lg">Track your journey to English mastery.</p>
       </header>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
         {stats.map((s, i) => (
-          <div key={i} className="p-6 bg-white border border-slate-100 rounded-3xl shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-2 bg-slate-50 rounded-xl">{s.icon}</div>
-              <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${s.trend.startsWith('+') ? 'bg-emerald-50 text-emerald-600' : s.trend.startsWith('-') ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
-                {s.trend}
-              </span>
+          <motion.div 
+            key={i}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.1 }}
+            className="p-8 bg-white border border-slate-100 rounded-[2.5rem] shadow-sm hover:shadow-md transition-shadow"
+          >
+            <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center mb-6">
+              {s.icon}
             </div>
-            <p className="text-2xl font-bold">{s.value}</p>
-            <p className="text-xs text-slate-400 font-medium uppercase tracking-wider mt-1">{s.label}</p>
-          </div>
+            <div className="text-4xl font-display font-black text-slate-900 mb-1">{s.value}</div>
+            <div className="text-sm font-bold text-slate-800">{s.label}</div>
+            <p className="text-xs text-slate-400 mt-1">{s.sub}</p>
+          </motion.div>
         ))}
       </div>
 
-      <div className="bg-white border border-slate-100 rounded-[2rem] p-8 shadow-sm mb-12">
-        <h3 className="text-xl font-bold mb-6">Fluency Trend</h3>
-        <div className="h-64 flex items-end gap-2">
-          {[40, 45, 38, 52, 60, 58, 72].map((h, i) => (
-            <div key={i} className="flex-1 flex flex-col items-center gap-2">
-              <motion.div 
-                initial={{ height: 0 }}
-                animate={{ height: `${h}%` }}
-                className="w-full bg-indigo-500 rounded-t-lg opacity-80 hover:opacity-100 transition-opacity"
-              />
-              <span className="text-[10px] text-slate-400 font-bold">S{i+1}</span>
+      <div className="p-10 bg-slate-900 rounded-[3rem] text-white relative overflow-hidden mb-12">
+        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
+          <div className="text-center md:text-left">
+            <h3 className="text-3xl font-display font-bold mb-2">Ready for more?</h3>
+            <p className="text-slate-400 max-w-sm">Consistency is the key to fluency. Complete one more session today to keep your streak alive.</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="text-center">
+              <div className="text-4xl font-display font-black text-brand-400">7</div>
+              <div className="text-[10px] font-black uppercase tracking-widest text-slate-500">Day Streak</div>
             </div>
-          ))}
+            <div className="w-px h-12 bg-slate-800" />
+            <div className="text-center">
+              <div className="text-4xl font-display font-black text-emerald-400">12</div>
+              <div className="text-[10px] font-black uppercase tracking-widest text-slate-500">Hours Practiced</div>
+            </div>
+          </div>
         </div>
+        <div className="absolute right-[-40px] top-[-40px] w-64 h-64 bg-brand-500/10 rounded-full blur-3xl" />
       </div>
 
       <div className="flex justify-center pb-12">
         <button 
           onClick={onReset}
-          className="flex items-center gap-2 text-slate-400 hover:text-indigo-600 font-bold text-xs uppercase tracking-widest transition-colors"
+          className="flex items-center gap-2 text-slate-400 hover:text-brand-600 font-black text-[10px] uppercase tracking-widest transition-colors"
         >
           <Settings size={16} /> Account Settings
         </button>
