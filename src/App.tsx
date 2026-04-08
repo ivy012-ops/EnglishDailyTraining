@@ -22,8 +22,21 @@ import {
   CheckCircle,
   AlertCircle
 } from 'lucide-react';
-import { GoogleGenAI } from "@google/genai";
 import { FALLBACK_SCENARIOS, FALLBACK_TOPICS, FALLBACK_VOCAB } from './data/fallbacks';
+
+// AI Proxy Helper
+async function callAI(params: { model?: string, contents: any, config?: any }) {
+  const response = await fetch('/api/ai/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params)
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'AI request failed');
+  }
+  return response.json();
+}
 
 // Types
 type AppState = 'onboarding' | 'scenarios' | 'conversation' | 'dashboard' | 'daily-practice' | 'daily-vocab' | 'settings';
@@ -217,8 +230,6 @@ function Onboarding({ onComplete }: { onComplete: (level: ProficiencyLevel) => v
   const [detectedLevel, setDetectedLevel] = useState<ProficiencyLevel>(null);
   const recognitionRef = useRef<any>(null);
 
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
-
   useEffect(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (SpeechRecognition) {
@@ -307,7 +318,7 @@ function Onboarding({ onComplete }: { onComplete: (level: ProficiencyLevel) => v
           }
         `;
 
-        const response = await ai.models.generateContent({
+        const response = await callAI({
           model,
           contents: prompt,
           config: { responseMimeType: "application/json" }
@@ -539,8 +550,6 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
   const recognitionRef = useRef<any>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
-
   // Timer logic
   useEffect(() => {
     if (hasStarted && timeLeft > 0 && !isFinished) {
@@ -575,7 +584,7 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
           "context": "A short 1-sentence description of the situation."
         }`;
 
-        const response = await ai.models.generateContent({
+        const response = await callAI({
           model: "gemini-3-flash-preview",
           contents: prompt,
           config: { responseMimeType: "application/json" }
@@ -691,7 +700,7 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
         }
       `;
 
-      const response = await ai.models.generateContent({
+      const response = await callAI({
         model: "gemini-3-flash-preview",
         contents: prompt,
         config: { responseMimeType: "application/json" }
@@ -1023,7 +1032,6 @@ function DailyPractice({ userLevel, onBack, onComplete }: { userLevel: Proficien
   
   const recognitionRef = useRef<any>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
   const generatePractice = async () => {
     setIsProcessing(true);
@@ -1037,7 +1045,7 @@ function DailyPractice({ userLevel, onBack, onComplete }: { userLevel: Proficien
         "tips": ["Short tip 1", "Short tip 2", "Short tip 3"]
       }`;
 
-      const response = await ai.models.generateContent({
+      const response = await callAI({
         model: "gemini-3-flash-preview",
         contents: prompt,
         config: { responseMimeType: "application/json" }
@@ -1143,7 +1151,7 @@ function DailyPractice({ userLevel, onBack, onComplete }: { userLevel: Proficien
         "improved_version": "..."
       }`;
 
-      const response = await ai.models.generateContent({
+      const response = await callAI({
         model: "gemini-3-flash-preview",
         contents: prompt,
         config: { responseMimeType: "application/json" }
@@ -1371,49 +1379,22 @@ function SettingsView({ profile, onBack, onReset }: { profile: UserProfile, onBa
     setDiagDetails(null);
 
     try {
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) {
-        setDiagStatus('error');
-        setDiagMessage("API Key Missing");
-        setDiagDetails("The GEMINI_API_KEY environment variable is not set. If you are in production, ensure you have added it to your environment variables.");
-        return;
-      }
+      const response = await fetch('/api/diagnostics');
+      const data = await response.json();
 
-      const ai = new GoogleGenAI({ apiKey });
-
-      setDiagMessage("Sending test prompt...");
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: "Say 'API Connection Successful' and nothing else."
-      });
-      const text = response.text || "";
-
-      if (text.includes("API Connection Successful")) {
+      if (data.status === 'success') {
         setDiagStatus('success');
-        setDiagMessage("API is working perfectly!");
+        setDiagMessage(data.message);
       } else {
         setDiagStatus('error');
-        setDiagMessage("Unexpected Response");
-        setDiagDetails(`The API responded but the content was unexpected: "${text}"`);
+        setDiagMessage(data.message);
+        setDiagDetails(data.details);
       }
     } catch (error: any) {
       console.error("Diagnostic Error:", error);
       setDiagStatus('error');
-      
-      // Check for specific error types
-      if (error.message?.includes("API_KEY_INVALID") || error.status === 403) {
-        setDiagMessage("Invalid API Key");
-        setDiagDetails("The provided API key is invalid or has expired. Please check your Gemini API key in the Google AI Studio settings.");
-      } else if (error.message?.includes("SAFETY") || error.finishReason === "SAFETY") {
-        setDiagMessage("Safety Filter Triggered");
-        setDiagDetails("The request was blocked by the Gemini safety filters. This usually happens if the prompt contains sensitive topics.");
-      } else if (error.message?.includes("quota") || error.status === 429) {
-        setDiagMessage("Rate Limit Exceeded");
-        setDiagDetails("You have exceeded your API quota. Please wait a moment or check your billing status.");
-      } else {
-        setDiagMessage("Connection Failed");
-        setDiagDetails(error.message || "An unknown error occurred while connecting to the Gemini API.");
-      }
+      setDiagMessage("Connection Failed");
+      setDiagDetails(error.message || "An unknown error occurred while connecting to the proxy server.");
     }
   };
 
@@ -1554,7 +1535,6 @@ function DailyVocab({ userLevel, onBack, onComplete }: { userLevel: ProficiencyL
   
   const recognitionRef = useRef<any>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
   const generateVocab = async () => {
     setIsProcessing(true);
@@ -1572,7 +1552,7 @@ function DailyVocab({ userLevel, onBack, onComplete }: { userLevel: ProficiencyL
         "challenge": "A short prompt like 'Describe your favorite travel memory using these words.'"
       }`;
 
-      const response = await ai.models.generateContent({
+      const response = await callAI({
         model: "gemini-3-flash-preview",
         contents: prompt,
         config: { responseMimeType: "application/json" }
@@ -1679,7 +1659,7 @@ function DailyVocab({ userLevel, onBack, onComplete }: { userLevel: ProficiencyL
         "natural_alternative": "..."
       }`;
 
-      const response = await ai.models.generateContent({
+      const response = await callAI({
         model: "gemini-3-flash-preview",
         contents: prompt,
         config: { responseMimeType: "application/json" }
