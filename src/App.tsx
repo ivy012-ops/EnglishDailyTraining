@@ -103,31 +103,33 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-indigo-100">
       {/* Navigation Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-6 py-3 flex justify-around items-center z-50 md:top-0 md:bottom-auto md:flex-col md:w-20 md:h-screen md:border-r md:border-t-0">
-        <NavIcon 
-          active={appState === 'scenarios'} 
-          onClick={() => setAppState('scenarios')} 
-          icon={<BookOpen size={24} />} 
-          label="Practice" 
-        />
-        <NavIcon 
-          active={appState === 'dashboard'} 
-          onClick={() => setAppState('dashboard')} 
-          icon={<LayoutDashboard size={24} />} 
-          label="Stats" 
-        />
-        <div className="hidden md:flex flex-col gap-6 mt-auto pb-6">
+      {userProfile.level && (
+        <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-6 py-3 flex justify-around items-center z-50 md:top-0 md:bottom-auto md:flex-col md:w-20 md:h-screen md:border-r md:border-t-0">
           <NavIcon 
-            active={appState === 'settings'} 
-            onClick={() => setAppState('settings')} 
-            icon={<Settings size={24} />} 
-            label="Settings" 
+            active={appState === 'scenarios'} 
+            onClick={() => setAppState('scenarios')} 
+            icon={<BookOpen size={24} />} 
+            label="Practice" 
           />
-        </div>
-      </nav>
+          <NavIcon 
+            active={appState === 'dashboard'} 
+            onClick={() => setAppState('dashboard')} 
+            icon={<LayoutDashboard size={24} />} 
+            label="Stats" 
+          />
+          <div className="hidden md:flex flex-col gap-6 mt-auto pb-6">
+            <NavIcon 
+              active={appState === 'settings'} 
+              onClick={() => setAppState('settings')} 
+              icon={<Settings size={24} />} 
+              label="Settings" 
+            />
+          </div>
+        </nav>
+      )}
 
       {/* Main Content Area */}
-      <main className="pb-24 md:pb-0 md:pl-20 min-h-screen">
+      <main className={`pb-24 md:pb-0 min-h-screen ${userProfile.level ? 'md:pl-20' : ''}`}>
         <AnimatePresence mode="wait">
           {appState === 'onboarding' && (
             <Onboarding key="onboarding" onComplete={handleOnboardingComplete} />
@@ -324,7 +326,7 @@ function Onboarding({ onComplete }: { onComplete: (level: ProficiencyLevel) => v
           config: { responseMimeType: "application/json" }
         });
 
-        const result = JSON.parse(response.text || "{}");
+        const result = JSON.parse(response.candidates?.[0]?.content?.parts?.[0]?.text || "{}");
         setDetectedLevel(result.level);
         setStep('result');
       } catch (error) {
@@ -590,7 +592,7 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
           config: { responseMimeType: "application/json" }
         });
 
-        const data = JSON.parse(response.text || "{}");
+        const data = JSON.parse(response.candidates?.[0]?.content?.parts?.[0]?.text || "{}");
         setSubTopic(data.subTopic || "General Practice");
         setContext(data.context || "Practice your English in this real-life scenario.");
         setOpeningLine(data.openingLine || "Hello! Let's start our practice.");
@@ -706,7 +708,7 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
         config: { responseMimeType: "application/json" }
       });
 
-      const data = JSON.parse(response.text || "{}");
+      const data = JSON.parse(response.candidates?.[0]?.content?.parts?.[0]?.text || "{}");
       
       const feedback = {
         original: text,
@@ -1051,7 +1053,7 @@ function DailyPractice({ userLevel, onBack, onComplete }: { userLevel: Proficien
         config: { responseMimeType: "application/json" }
       });
 
-      const data = JSON.parse(response.text || "{}");
+      const data = JSON.parse(response.candidates?.[0]?.content?.parts?.[0]?.text || "{}");
       setTopic(data.topic || "General Topic");
       setTips(data.tips || ["Focus on clarity", "Structure your points", "Keep a steady pace"]);
       setStep('practice');
@@ -1157,7 +1159,7 @@ function DailyPractice({ userLevel, onBack, onComplete }: { userLevel: Proficien
         config: { responseMimeType: "application/json" }
       });
 
-      setFeedback(JSON.parse(response.text || "{}"));
+      setFeedback(JSON.parse(response.candidates?.[0]?.content?.parts?.[0]?.text || "{}"));
     } catch (error) {
       console.error("Feedback Error:", error);
       setFeedback({
@@ -1558,7 +1560,7 @@ function DailyVocab({ userLevel, onBack, onComplete }: { userLevel: ProficiencyL
         config: { responseMimeType: "application/json" }
       });
 
-      const data = JSON.parse(response.text || "{}");
+      const data = JSON.parse(response.candidates?.[0]?.content?.parts?.[0]?.text || "{}");
       setVocab(data.vocab || []);
       setChallenge(data.challenge || "Practice using these words in a few sentences.");
       setStep('practice');
@@ -1665,7 +1667,7 @@ function DailyVocab({ userLevel, onBack, onComplete }: { userLevel: ProficiencyL
         config: { responseMimeType: "application/json" }
       });
 
-      setFeedback(JSON.parse(response.text || "{}"));
+      setFeedback(JSON.parse(response.candidates?.[0]?.content?.parts?.[0]?.text || "{}"));
     } catch (error) {
       console.error("Vocab Feedback Error:", error);
       setFeedback({
