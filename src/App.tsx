@@ -572,24 +572,25 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
     const initConversation = async () => {
       setIsProcessing(true);
       try {
-        const prompt = `Generate a random, specific sub-topic, a creative opening line, and a short 1-sentence context description for an English speaking practice session.
+        const prompt = `Generate a specific sub-topic for English practice.
         Scenario: ${scenarioId}
-        Learner Level: ${userLevel}
+        Level: ${userLevel}
         
-        The opening line should be natural and put the user in the situation immediately.
-        The context should describe the setting or the user's role (e.g. 'You are at a busy cafe in London trying to order a special drink.').
+        Rules:
+        1. subTopic: Specific situation (e.g. 'Asking for a refund').
+        2. openingLine: Natural first sentence from AI.
+        3. context: 1-sentence setting (e.g. 'You are at a store counter.').
         
-        Return ONLY a JSON object:
-        {
-          "subTopic": "A specific focus (e.g. 'Ordering at a London Cafe')",
-          "openingLine": "The first thing the AI says to the user.",
-          "context": "A short 1-sentence description of the situation."
-        }`;
+        JSON Format: {"subTopic": "", "openingLine": "", "context": ""}`;
 
         const response = await callAI({
           model: "gemini-3-flash-preview",
           contents: prompt,
-          config: { responseMimeType: "application/json" }
+          config: { 
+            responseMimeType: "application/json",
+            maxOutputTokens: 150,
+            temperature: 0.7
+          }
         });
 
         const data = JSON.parse(response.candidates?.[0]?.content?.parts?.[0]?.text || "{}");
@@ -674,26 +675,21 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
       const history = messages.map(m => `${m.role.toUpperCase()}: ${m.text}`).join('\n');
       
       const prompt = `
-        You are an English tutor for an intermediate (Level ${userLevel}) learner.
-        Scenario: ${scenarioId} (${subTopic})
+        Role: English tutor for a ${userLevel} learner.
+        Current Situation: ${context}
+        Current Topic: ${subTopic}
         
         Conversation History:
         ${history}
         
-        The user just spoke: "${text}"
-        Time remaining in session: ${Math.floor(timeLeft / 60)}m ${timeLeft % 60}s
+        User Input: "${text}"
+        Time Left: ${Math.floor(timeLeft / 60)}m ${timeLeft % 60}s
         
-        Task 1: Provide "IELTS Speaking Feedback" based on:
-        ${IELTS_CRITERIA}
+        Task:
+        1. Provide IELTS feedback (improved version, 1-2 sentence explanation, score estimate).
+        2. Continue the conversation naturally based on the "Current Situation". Stay in character.
         
-        - improved: A natural, fluent version of what they said.
-        - explanation: Why the change was made, focusing on IELTS criteria (max 2 sentences).
-        - score_estimate: A rough IELTS score for this turn (e.g. 5.5).
-        
-        Task 2: Continue the conversation.
-        - next_turn: A natural follow-up question or response. If time is low (under 1 min), start wrapping up.
-        
-        Return the response in JSON format:
+        JSON Format:
         {
           "improved": "...",
           "explanation": "...",
@@ -705,7 +701,10 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
       const response = await callAI({
         model: "gemini-3-flash-preview",
         contents: prompt,
-        config: { responseMimeType: "application/json" }
+        config: { 
+          responseMimeType: "application/json",
+          temperature: 0.8
+        }
       });
 
       const data = JSON.parse(response.candidates?.[0]?.content?.parts?.[0]?.text || "{}");
