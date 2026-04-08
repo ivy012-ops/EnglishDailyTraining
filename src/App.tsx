@@ -17,7 +17,10 @@ import {
   MessageSquare,
   Award,
   Volume2,
-  RefreshCw
+  RefreshCw,
+  Activity,
+  CheckCircle,
+  AlertCircle
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 import { FALLBACK_SCENARIOS, FALLBACK_TOPICS, FALLBACK_VOCAB } from './data/fallbacks';
@@ -1358,6 +1361,61 @@ function DailyPractice({ userLevel, onBack, onComplete }: { userLevel: Proficien
 }
 function SettingsView({ profile, onBack, onReset }: { profile: UserProfile, onBack: () => void, onReset: () => void, key?: string }) {
   const [showConfirmReset, setShowConfirmReset] = useState(false);
+  const [diagStatus, setDiagStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+  const [diagMessage, setDiagMessage] = useState("");
+  const [diagDetails, setDiagDetails] = useState<any>(null);
+
+  const runDiagnostics = async () => {
+    setDiagStatus('testing');
+    setDiagMessage("Initializing test...");
+    setDiagDetails(null);
+
+    try {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        setDiagStatus('error');
+        setDiagMessage("API Key Missing");
+        setDiagDetails("The GEMINI_API_KEY environment variable is not set. If you are in production, ensure you have added it to your environment variables.");
+        return;
+      }
+
+      const ai = new GoogleGenAI({ apiKey });
+
+      setDiagMessage("Sending test prompt...");
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: "Say 'API Connection Successful' and nothing else."
+      });
+      const text = response.text || "";
+
+      if (text.includes("API Connection Successful")) {
+        setDiagStatus('success');
+        setDiagMessage("API is working perfectly!");
+      } else {
+        setDiagStatus('error');
+        setDiagMessage("Unexpected Response");
+        setDiagDetails(`The API responded but the content was unexpected: "${text}"`);
+      }
+    } catch (error: any) {
+      console.error("Diagnostic Error:", error);
+      setDiagStatus('error');
+      
+      // Check for specific error types
+      if (error.message?.includes("API_KEY_INVALID") || error.status === 403) {
+        setDiagMessage("Invalid API Key");
+        setDiagDetails("The provided API key is invalid or has expired. Please check your Gemini API key in the Google AI Studio settings.");
+      } else if (error.message?.includes("SAFETY") || error.finishReason === "SAFETY") {
+        setDiagMessage("Safety Filter Triggered");
+        setDiagDetails("The request was blocked by the Gemini safety filters. This usually happens if the prompt contains sensitive topics.");
+      } else if (error.message?.includes("quota") || error.status === 429) {
+        setDiagMessage("Rate Limit Exceeded");
+        setDiagDetails("You have exceeded your API quota. Please wait a moment or check your billing status.");
+      } else {
+        setDiagMessage("Connection Failed");
+        setDiagDetails(error.message || "An unknown error occurred while connecting to the Gemini API.");
+      }
+    }
+  };
 
   return (
     <motion.div 
@@ -1389,6 +1447,61 @@ function SettingsView({ profile, onBack, onReset }: { profile: UserProfile, onBa
               <span className="font-display font-bold text-slate-900">{profile.sessionsCompleted}</span>
             </div>
           </div>
+        </div>
+
+        <div className="p-8 bg-white border border-slate-100 rounded-[2.5rem] shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-display font-bold text-slate-900">API Diagnostics</h3>
+            <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
+              diagStatus === 'success' ? 'bg-emerald-50 text-emerald-600' :
+              diagStatus === 'error' ? 'bg-red-50 text-red-600' :
+              diagStatus === 'testing' ? 'bg-indigo-50 text-indigo-600 animate-pulse' :
+              'bg-slate-50 text-slate-400'
+            }`}>
+              {diagStatus === 'idle' ? 'Ready' : diagStatus}
+            </div>
+          </div>
+          
+          <p className="text-slate-500 text-sm mb-6 leading-relaxed">
+            Use this tool to verify if your Gemini API connection is working correctly in your current environment.
+          </p>
+
+          {diagStatus !== 'idle' && (
+            <div className={`mb-6 p-4 rounded-2xl border ${
+              diagStatus === 'success' ? 'bg-emerald-50/50 border-emerald-100' :
+              diagStatus === 'error' ? 'bg-red-50/50 border-red-100' :
+              'bg-slate-50 border-slate-100'
+            }`}>
+              <div className="flex items-start gap-3">
+                <div className={`mt-0.5 ${
+                  diagStatus === 'success' ? 'text-emerald-600' :
+                  diagStatus === 'error' ? 'text-red-600' :
+                  'text-indigo-600'
+                }`}>
+                  {diagStatus === 'testing' ? <RefreshCw size={16} className="animate-spin" /> : 
+                   diagStatus === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+                </div>
+                <div>
+                  <p className={`text-sm font-bold ${
+                    diagStatus === 'success' ? 'text-emerald-900' :
+                    diagStatus === 'error' ? 'text-red-900' :
+                    'text-slate-900'
+                  }`}>{diagMessage}</p>
+                  {diagDetails && (
+                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">{diagDetails}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <button 
+            onClick={runDiagnostics}
+            disabled={diagStatus === 'testing'}
+            className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            <Activity size={18} /> Run Connection Test
+          </button>
         </div>
 
         <div className="p-8 bg-white border border-slate-100 rounded-[2.5rem] shadow-sm">
