@@ -18,17 +18,24 @@ async function startServer() {
       const { model, contents, config } = req.body;
       const apiKey = process.env.GEMINI_API_KEY;
 
-      if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
+      if (!apiKey) {
         return res.status(500).json({ 
-          error: "GEMINI_API_KEY is not configured.",
-          details: "Please set your Gemini API Key in the AI Studio Secrets panel."
+          error: "GEMINI_API_KEY is missing.",
+          details: "Please add your Gemini API Key to the 'Secrets' or 'Settings' panel in AI Studio. If you are deploying to Vercel, add it as an Environment Variable."
         });
       }
 
       const ai = new GoogleGenAI({ apiKey });
+      
+      // Normalize contents to the format expected by @google/genai
+      let normalizedContents = contents;
+      if (typeof contents === 'string') {
+        normalizedContents = [{ role: 'user', parts: [{ text: contents }] }];
+      }
+
       const response = await ai.models.generateContent({
-        model: model || "gemini-3-flash-preview",
-        contents,
+        model: model || "gemini-2.0-flash",
+        contents: normalizedContents,
         config
       });
 
@@ -46,14 +53,14 @@ async function startServer() {
   app.get("/api/diagnostics", async (req, res) => {
     try {
       const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
-        return res.json({ status: 'error', message: 'API Key Missing', details: 'GEMINI_API_KEY is not set correctly.' });
+      if (!apiKey) {
+        return res.json({ status: 'error', message: 'API Key Missing', details: 'GEMINI_API_KEY is not set. Please add it to your project secrets.' });
       }
 
       const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: "Say 'OK'"
+        model: "gemini-2.0-flash",
+        contents: [{ role: 'user', parts: [{ text: "Say 'OK'" }] }]
       });
 
       if (response.text?.includes("OK")) {

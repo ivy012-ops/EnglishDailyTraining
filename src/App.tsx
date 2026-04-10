@@ -139,7 +139,7 @@ export default function App() {
         `;
 
         const response = await callAI({
-          model: "gemini-3-flash-preview",
+          model: "gemini-2.0-flash",
           contents: prompt,
           config: { responseMimeType: "application/json" }
         });
@@ -310,7 +310,7 @@ export default function App() {
           )}
           {appState === 'conversation' && (
             <Conversation 
-              key="conversation" 
+              key={`conversation-${selectedScenario}`} 
               userLevel={userProfile.level} 
               scenarioId={selectedScenario}
               onBack={() => setAppState('scenarios')} 
@@ -467,7 +467,7 @@ function Onboarding({ onComplete, onLogin, user, error }: { onComplete: (level: 
     } else {
       setIsProcessing(true);
       try {
-        const model = "gemini-3-flash-preview";
+        const model = "gemini-2.0-flash";
         const prompt = `
           Analyze the following English learner's spoken responses (transcribed) to determine their level based on ${IELTS_CRITERIA}.
           
@@ -721,7 +721,7 @@ function ScenarioSelection({ userLevel, onSelect, onDailyPractice, onDailyVocab,
   );
 }
 
-function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel: ProficiencyLevel, scenarioId: string | null, onBack: () => void, onComplete: () => void, key?: string }) {
+function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel: ProficiencyLevel, scenarioId: string | null, onBack: () => void, onComplete: (data?: any) => void, key?: string }) {
   const [messages, setMessages] = useState<{ role: 'ai' | 'user', text: string, feedback?: any }[]>([]);
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -756,19 +756,20 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
     const initConversation = async () => {
       setIsProcessing(true);
       try {
-        const prompt = `Generate a specific sub-topic for English practice.
+        const prompt = `Generate a UNIQUE and SPECIFIC sub-topic for English practice.
         Scenario: ${scenarioId}
         Level: ${userLevel}
+        Random Seed: ${Math.random()}
         
         Rules:
-        1. subTopic: Specific situation (e.g. 'Asking for a refund').
-        2. openingLine: Natural first sentence from AI.
-        3. context: 1-sentence setting (e.g. 'You are at a store counter.').
+        1. subTopic: A very specific situation (e.g. instead of 'Job Interview', use 'Interview for a Senior Designer role at a tech startup').
+        2. openingLine: Natural first sentence from AI to start the roleplay.
+        3. context: 1-sentence setting (e.g. 'You are sitting in a glass-walled office with the Creative Director.').
         
         JSON Format: {"subTopic": "", "openingLine": "", "context": ""}`;
 
         const response = await callAI({
-          model: "gemini-3-flash-preview",
+          model: "gemini-2.0-flash",
           contents: prompt,
           config: { 
             responseMimeType: "application/json",
@@ -870,20 +871,20 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
         Time Left: ${Math.floor(timeLeft / 60)}m ${timeLeft % 60}s
         
         Task:
-        1. Provide IELTS feedback (improved version, 1-2 sentence explanation, score estimate).
-        2. Continue the conversation naturally based on the "Current Situation". Stay in character.
+        1. Provide IELTS feedback (improved version of user's last sentence, 1-2 sentence explanation of why it's better, and a score estimate like '6.5' or '7.0').
+        2. Continue the conversation naturally based on the "Current Situation". Stay in character as the person in the scenario.
         
         JSON Format:
         {
-          "improved": "...",
-          "explanation": "...",
-          "score_estimate": "...",
-          "next_turn": "..."
+          "improved": "A more natural/advanced version of the user's input",
+          "explanation": "Brief linguistic explanation of the improvement",
+          "score_estimate": "IELTS Band (e.g. 7.5)",
+          "next_turn": "Your natural response in the roleplay"
         }
       `;
 
       const response = await callAI({
-        model: "gemini-3-flash-preview",
+        model: "gemini-2.0-flash",
         contents: prompt,
         config: { 
           responseMimeType: "application/json",
@@ -891,6 +892,7 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
         }
       });
 
+      console.log("AI Response:", response.text);
       const data = JSON.parse(response.text || "{}");
       
       const feedback = {
@@ -908,10 +910,16 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
       setUserInput("");
     } catch (error) {
       console.error("AI Error:", error);
+      const fallbackFeedback = {
+        original: text,
+        improved: text, // No improvement available
+        explanation: "I'm having a little trouble connecting to my linguistic analysis engine, but I'm still listening!",
+        score: "N/A"
+      };
       setMessages(prev => [
         ...prev, 
-        { role: 'user', text },
-        { role: 'ai', text: "That's interesting! Could you tell me more about that?" }
+        { role: 'user', text, feedback: fallbackFeedback },
+        { role: 'ai', text: "That's interesting! Could you tell me more about that? (Note: Feedback is currently limited due to a connection issue)" }
       ]);
       setUserInput("");
     } finally {
@@ -1218,7 +1226,7 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
   );
 }
 
-function DailyPractice({ userLevel, onBack, onComplete }: { userLevel: ProficiencyLevel, onBack: () => void, onComplete: () => void, key?: string }) {
+function DailyPractice({ userLevel, onBack, onComplete }: { userLevel: ProficiencyLevel, onBack: () => void, onComplete: (data?: any) => void, key?: string }) {
   const [step, setStep] = useState<'setup' | 'practice' | 'feedback'>('setup');
   const [topic, setTopic] = useState("");
   const [tips, setTips] = useState<string[]>([]);
@@ -1246,7 +1254,7 @@ function DailyPractice({ userLevel, onBack, onComplete }: { userLevel: Proficien
       }`;
 
       const response = await callAI({
-        model: "gemini-3-flash-preview",
+        model: "gemini-2.0-flash",
         contents: prompt,
         config: { responseMimeType: "application/json" }
       });
@@ -1352,7 +1360,7 @@ function DailyPractice({ userLevel, onBack, onComplete }: { userLevel: Proficien
       }`;
 
       const response = await callAI({
-        model: "gemini-3-flash-preview",
+        model: "gemini-2.0-flash",
         contents: prompt,
         config: { responseMimeType: "application/json" }
       });
@@ -1746,7 +1754,7 @@ function SettingsView({ profile, onBack, onReset, onLogout, user }: { profile: U
   );
 }
 
-function DailyVocab({ userLevel, onBack, onComplete }: { userLevel: ProficiencyLevel, onBack: () => void, onComplete: () => void, key?: string }) {
+function DailyVocab({ userLevel, onBack, onComplete }: { userLevel: ProficiencyLevel, onBack: () => void, onComplete: (data?: any) => void, key?: string }) {
   const [step, setStep] = useState<'setup' | 'practice' | 'feedback'>('setup');
   const [vocab, setVocab] = useState<{ word: string, meaning: string, example: string }[]>([]);
   const [challenge, setChallenge] = useState("");
@@ -1778,7 +1786,7 @@ function DailyVocab({ userLevel, onBack, onComplete }: { userLevel: ProficiencyL
       }`;
 
       const response = await callAI({
-        model: "gemini-3-flash-preview",
+        model: "gemini-2.0-flash",
         contents: prompt,
         config: { responseMimeType: "application/json" }
       });
@@ -1885,7 +1893,7 @@ function DailyVocab({ userLevel, onBack, onComplete }: { userLevel: ProficiencyL
       }`;
 
       const response = await callAI({
-        model: "gemini-3-flash-preview",
+        model: "gemini-2.0-flash",
         contents: prompt,
         config: { responseMimeType: "application/json" }
       });
