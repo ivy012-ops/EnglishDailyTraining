@@ -57,6 +57,7 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [showLevelUp, setShowLevelUp] = useState<{from: ProficiencyLevel, to: ProficiencyLevel} | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile>({
     level: null,
     sessionsCompleted: 0,
@@ -109,25 +110,61 @@ export default function App() {
   };
 
   const handleSessionComplete = async (sessionData?: any) => {
-    setUserProfile(prev => {
-      const newProfile = { 
-        ...prev, 
-        sessionsCompleted: prev.sessionsCompleted + 1,
-        averageLatency: Math.max(1.5, prev.averageLatency > 0 ? prev.averageLatency * 0.95 : 2.8),
-        fillerWordFrequency: Math.max(1.2, prev.fillerWordFrequency > 0 ? prev.fillerWordFrequency * 0.9 : 5.4)
-      };
-      
-      if (user) {
-        saveUserProfile(user.uid, newProfile);
-        if (sessionData) {
-          saveSession(user.uid, sessionData);
+    // 1. Update stats
+    const updatedProfile = { ...userProfile };
+    updatedProfile.sessionsCompleted += 1;
+    updatedProfile.averageLatency = Math.max(1.5, userProfile.averageLatency > 0 ? userProfile.averageLatency * 0.95 : 2.8);
+    updatedProfile.fillerWordFrequency = Math.max(1.2, userProfile.fillerWordFrequency > 0 ? userProfile.fillerWordFrequency * 0.9 : 5.4);
+
+    // 2. Check for Level Up (only if not already C1)
+    if (sessionData && userProfile.level !== 'C1') {
+      try {
+        const prompt = `
+          Analyze this English practice session. 
+          Current Level: ${userProfile.level}
+          
+          Transcript:
+          ${sessionData.messages.map((m: any) => `${m.role}: ${m.text}`).join('\n')}
+          
+          Criteria for Level Up to ${userProfile.level === 'B1' ? 'B2' : 'C1'}:
+          1. Use of precise vocabulary (not just basic words).
+          2. Use of complex connectors (However, Consequently, etc.).
+          3. Ability to elaborate with reasons and examples.
+          
+          Return JSON:
+          {
+            "shouldPromote": boolean,
+            "reason": "Short explanation"
+          }
+        `;
+
+        const response = await callAI({
+          model: "gemini-3-flash-preview",
+          contents: prompt,
+          config: { responseMimeType: "application/json" }
+        });
+
+        const result = JSON.parse(response.text || "{}");
+        if (result.shouldPromote) {
+          const nextLevel: ProficiencyLevel = userProfile.level === 'B1' ? 'B2' : 'C1';
+          setShowLevelUp({ from: userProfile.level, to: nextLevel });
+          updatedProfile.level = nextLevel;
         }
-      } else {
-        localStorage.setItem('userProfile', JSON.stringify(newProfile));
+      } catch (error) {
+        console.error("Level check failed", error);
       }
-      
-      return newProfile;
-    });
+    }
+
+    setUserProfile(updatedProfile);
+    
+    if (user) {
+      await saveUserProfile(user.uid, updatedProfile);
+      if (sessionData) {
+        await saveSession(user.uid, sessionData);
+      }
+    } else {
+      localStorage.setItem('userProfile', JSON.stringify(updatedProfile));
+    }
   };
 
   const handleResetProfile = async () => {
@@ -216,6 +253,37 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className={`pb-24 md:pb-0 min-h-screen ${userProfile.level ? 'md:pl-20' : ''}`}>
+        <AnimatePresence>
+          {showLevelUp && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/90 backdrop-blur-sm"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                className="bg-white rounded-[3rem] p-12 max-w-md w-full text-center shadow-2xl"
+              >
+                <div className="w-24 h-24 bg-brand-50 text-brand-600 rounded-[2.5rem] flex items-center justify-center mx-auto mb-8">
+                  <Award size={48} />
+                </div>
+                <h2 className="text-4xl font-display font-black text-slate-900 mb-4 tracking-tighter">Level Up!</h2>
+                <p className="text-slate-500 mb-8 text-lg">
+                  Amazing progress! You've moved from <span className="font-bold text-slate-900">{showLevelUp.from}</span> to <span className="font-bold text-brand-600">{showLevelUp.to}</span>.
+                </p>
+                <button 
+                  onClick={() => setShowLevelUp(null)}
+                  className="w-full py-5 bg-brand-600 text-white rounded-[2rem] font-bold text-lg hover:bg-brand-700 transition-all shadow-xl shadow-brand-100"
+                >
+                  Continue Journey
+                </button>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <AnimatePresence mode="wait">
           {appState === 'onboarding' && (
             <Onboarding 
@@ -246,7 +314,10 @@ export default function App() {
               userLevel={userProfile.level} 
               scenarioId={selectedScenario}
               onBack={() => setAppState('scenarios')} 
-              onComplete={handleSessionComplete}
+              onComplete={(data) => {
+                handleSessionComplete(data);
+                setAppState('scenarios');
+              }}
             />
           )}
           {appState === 'daily-practice' && (
@@ -855,6 +926,15 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
     }
   };
 
+  const handleFinish = () => {
+    setIsFinished(true);
+    onComplete({
+      scenario: scenarioId,
+      topic: subTopic,
+      messages: messages
+    });
+  };
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -894,6 +974,12 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
           </AnimatePresence>
         </div>
         <div className="flex items-center gap-2">
+          <button 
+            onClick={handleFinish}
+            className="px-4 py-2 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-slate-800 transition-all"
+          >
+            Finish
+          </button>
           <button 
             onClick={() => setRefreshKey(prev => prev + 1)}
             disabled={isProcessing || messages.length > 1}
@@ -2022,9 +2108,27 @@ function DailyVocab({ userLevel, onBack, onComplete }: { userLevel: ProficiencyL
 
 function Dashboard({ profile, onReset }: { profile: UserProfile, onReset: () => void, key?: string }) {
   const stats = [
-    { label: 'Sessions', value: profile.sessionsCompleted, icon: <History className="text-brand-500" />, sub: 'Total completed' },
-    { label: 'Latency', value: `${profile.averageLatency.toFixed(1)}s`, icon: <TrendingUp className="text-emerald-500" />, sub: 'Avg. response time' },
-    { label: 'Fillers', value: `${profile.fillerWordFrequency.toFixed(1)}%`, icon: <MessageSquare className="text-amber-500" />, sub: 'Filler word rate' },
+    { 
+      label: 'Sessions', 
+      value: profile.sessionsCompleted, 
+      icon: <History className="text-brand-500" />, 
+      sub: 'Total completed',
+      info: 'The total number of speaking sessions you have finished.'
+    },
+    { 
+      label: 'Latency', 
+      value: `${profile.averageLatency.toFixed(1)}s`, 
+      icon: <TrendingUp className="text-emerald-500" />, 
+      sub: 'Avg. response time',
+      info: 'How fast you respond to the AI. Lower time means you are thinking less in your native language and more in English!'
+    },
+    { 
+      label: 'Fillers', 
+      value: `${profile.fillerWordFrequency.toFixed(1)}%`, 
+      icon: <MessageSquare className="text-amber-500" />, 
+      sub: 'Filler word rate',
+      info: 'The percentage of "um", "uh", or "like" in your speech. Lowering this makes you sound more polished and professional.'
+    },
   ];
 
   return (
@@ -2048,8 +2152,17 @@ function Dashboard({ profile, onReset }: { profile: UserProfile, onReset: () => 
             transition={{ delay: i * 0.1 }}
             className="p-8 bg-white border border-slate-100 rounded-[2.5rem] shadow-sm hover:shadow-md transition-shadow"
           >
-            <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center mb-6">
-              {s.icon}
+            <div className="flex items-center justify-between mb-6">
+              <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center">
+                {s.icon}
+              </div>
+              <div className="group relative">
+                <AlertCircle size={16} className="text-slate-300 hover:text-slate-400 cursor-help transition-colors" />
+                <div className="absolute bottom-full right-0 mb-2 w-48 p-3 bg-slate-900 text-white text-[10px] leading-relaxed rounded-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-xl z-20">
+                  {s.info}
+                  <div className="absolute top-full right-2 border-8 border-transparent border-t-slate-900" />
+                </div>
+              </div>
             </div>
             <div className="text-4xl font-display font-black text-slate-900 mb-1">{s.value}</div>
             <div className="text-sm font-bold text-slate-800">{s.label}</div>
