@@ -139,7 +139,7 @@ export default function App() {
         `;
 
         const response = await callAI({
-          model: "gemini-1.5-flash",
+          model: "gemini-3-flash-preview",
           contents: prompt,
           config: { responseMimeType: "application/json" }
         });
@@ -467,7 +467,7 @@ function Onboarding({ onComplete, onLogin, user, error }: { onComplete: (level: 
     } else {
       setIsProcessing(true);
       try {
-        const model = "gemini-1.5-flash";
+        const model = "gemini-3-flash-preview";
         const prompt = `
           Analyze the following English learner's spoken responses (transcribed) to determine their level based on ${IELTS_CRITERIA}.
           
@@ -769,7 +769,7 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
         JSON Format: {"subTopic": "", "openingLine": "", "context": ""}`;
 
         const response = await callAI({
-          model: "gemini-1.5-flash",
+          model: "gemini-3-flash-preview",
           contents: prompt,
           config: { 
             responseMimeType: "application/json",
@@ -884,7 +884,7 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
       `;
 
       const response = await callAI({
-        model: "gemini-1.5-flash",
+        model: "gemini-3-flash-preview",
         contents: prompt,
         config: { 
           responseMimeType: "application/json",
@@ -1254,7 +1254,7 @@ function DailyPractice({ userLevel, onBack, onComplete }: { userLevel: Proficien
       }`;
 
       const response = await callAI({
-        model: "gemini-1.5-flash",
+        model: "gemini-3-flash-preview",
         contents: prompt,
         config: { responseMimeType: "application/json" }
       });
@@ -1360,7 +1360,7 @@ function DailyPractice({ userLevel, onBack, onComplete }: { userLevel: Proficien
       }`;
 
       const response = await callAI({
-        model: "gemini-1.5-flash",
+        model: "gemini-3-flash-preview",
         contents: prompt,
         config: { responseMimeType: "application/json" }
       });
@@ -1786,7 +1786,7 @@ function DailyVocab({ userLevel, onBack, onComplete }: { userLevel: ProficiencyL
       }`;
 
       const response = await callAI({
-        model: "gemini-1.5-flash",
+        model: "gemini-3-flash-preview",
         contents: prompt,
         config: { responseMimeType: "application/json" }
       });
@@ -1893,7 +1893,7 @@ function DailyVocab({ userLevel, onBack, onComplete }: { userLevel: ProficiencyL
       }`;
 
       const response = await callAI({
-        model: "gemini-1.5-flash",
+        model: "gemini-3-flash-preview",
         contents: prompt,
         config: { responseMimeType: "application/json" }
       });

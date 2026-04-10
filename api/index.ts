@@ -13,11 +13,16 @@ app.post("/api/ai/generate", async (req, res) => {
     const { model, contents, config } = req.body;
     let apiKey = process.env.GEMINI_API_KEY;
 
-    // Security check: If key is missing, return a clear error
-    if (!apiKey) {
+    // Clean the API key (remove quotes and whitespace)
+    if (apiKey) {
+      apiKey = apiKey.trim().replace(/^["']|["']$/g, '');
+    }
+
+    // Security check: If key is missing or placeholder, return a clear error
+    if (!apiKey || apiKey === "MY_GEMINI_API_KEY" || apiKey.includes("TODO") || !apiKey.startsWith("AIza")) {
       return res.status(500).json({ 
-        error: "GEMINI_API_KEY is missing.",
-        details: "Please set your Gemini API Key in the environment variables (Vercel) or AI Studio Secrets panel."
+        error: "GEMINI_API_KEY is not configured correctly.",
+        details: "The current API key is either missing, a placeholder, or formatted incorrectly. Ensure it starts with 'AIza' and has no quotes or spaces."
       });
     }
 
@@ -30,7 +35,7 @@ app.post("/api/ai/generate", async (req, res) => {
     }
 
     const response = await ai.models.generateContent({
-      model: model || "gemini-1.5-flash",
+      model: model || "gemini-3-flash-preview",
       contents: normalizedContents,
       config
     });
@@ -49,14 +54,22 @@ app.post("/api/ai/generate", async (req, res) => {
 // Diagnostics Endpoint
 app.get("/api/diagnostics", async (req, res) => {
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return res.json({ status: 'error', message: 'API Key Missing', details: 'GEMINI_API_KEY is not set. Please add it to your project secrets.' });
+    let apiKey = process.env.GEMINI_API_KEY;
+    if (apiKey) {
+      apiKey = apiKey.trim().replace(/^["']|["']$/g, '');
+    }
+
+    if (!apiKey || apiKey === "MY_GEMINI_API_KEY" || apiKey.includes("TODO") || !apiKey.startsWith("AIza")) {
+      return res.json({ 
+        status: 'error', 
+        message: 'API Key Invalid', 
+        details: `GEMINI_API_KEY is missing, using a placeholder, or formatted incorrectly. Key starts with: ${apiKey ? apiKey.substring(0, 4) : 'null'}` 
+      });
     }
 
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-3-flash-preview",
       contents: [{ role: 'user', parts: [{ text: "Say 'OK'" }] }]
     });
 
