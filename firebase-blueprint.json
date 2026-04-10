@@ -1,0 +1,42 @@
+{
+  "entities": {
+    "userProfile": {
+      "title": "User Profile",
+      "description": "Stores user proficiency level and overall statistics.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "description": "User email" },
+        "level": { "type": "string", "enum": ["B1", "B2", "C1"], "description": "CEFR Proficiency Level" },
+        "sessionsCompleted": { "type": "number", "description": "Total sessions finished" },
+        "averageLatency": { "type": "number", "description": "Average response latency in seconds" },
+        "fillerWordFrequency": { "type": "number", "description": "Average filler words per minute" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last update timestamp" }
+      },
+      "required": ["uid", "level"]
+    },
+    "practiceSession": {
+      "title": "Practice Session",
+      "description": "Record of a single speaking practice session.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "User UID" },
+        "scenario": { "type": "string", "description": "Scenario ID or name" },
+        "topic": { "type": "string", "description": "Specific topic discussed" },
+        "timestamp": { "type": "string", "format": "date-time", "description": "When the session occurred" },
+        "feedback": { "type": "object", "description": "AI feedback received" }
+      },
+      "required": ["uid", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "userProfile",
+      "description": "User profile data"
+    },
+    "/users/{uid}/sessions/{sessionId}": {
+      "schema": "practiceSession",
+      "description": "History of practice sessions for a user"
+    }
+  }
+}

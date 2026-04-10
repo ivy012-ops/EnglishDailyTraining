@@ -23,6 +23,8 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { FALLBACK_SCENARIOS, FALLBACK_TOPICS, FALLBACK_VOCAB } from './data/fallbacks';
+import { auth, signInWithGoogle, logout, saveUserProfile, getUserProfile, saveSession } from './firebase';
+import { onAuthStateChanged, User } from 'firebase/auth';
 
 // AI Proxy Helper
 async function callAI(params: { model?: string, contents: any, config?: any }) {
@@ -52,6 +54,8 @@ interface UserProfile {
 export default function App() {
   const [appState, setAppState] = useState<AppState>('onboarding');
   const [selectedScenario, setSelectedScenario] = useState<string | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<UserProfile>({
     level: null,
     sessionsCompleted: 0,
@@ -59,46 +63,119 @@ export default function App() {
     fillerWordFrequency: 0
   });
 
-  // Check if user has already onboarded (mock for now)
+  // Firebase Auth Listener
   useEffect(() => {
-    const savedProfile = localStorage.getItem('userProfile');
-    if (savedProfile) {
-      setUserProfile(JSON.parse(savedProfile));
-      setAppState('scenarios');
-    }
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) {
+        const profile = await getUserProfile(currentUser.uid);
+        if (profile) {
+          setUserProfile({
+            level: profile.level,
+            sessionsCompleted: profile.sessionsCompleted || 0,
+            averageLatency: profile.averageLatency || 0,
+            fillerWordFrequency: profile.fillerWordFrequency || 0
+          });
+          setAppState('scenarios');
+        } else {
+          setAppState('onboarding');
+        }
+      } else {
+        // Fallback to local storage if not logged in
+        const savedProfile = localStorage.getItem('userProfile');
+        if (savedProfile) {
+          setUserProfile(JSON.parse(savedProfile));
+          setAppState('scenarios');
+        } else {
+          setAppState('onboarding');
+        }
+      }
+      setIsAuthLoading(false);
+    });
+    return () => unsubscribe();
   }, []);
 
-  const handleOnboardingComplete = (level: ProficiencyLevel) => {
+  const handleOnboardingComplete = async (level: ProficiencyLevel) => {
     const newProfile = { ...userProfile, level };
     setUserProfile(newProfile);
-    localStorage.setItem('userProfile', JSON.stringify(newProfile));
+    
+    if (user) {
+      await saveUserProfile(user.uid, newProfile);
+    } else {
+      localStorage.setItem('userProfile', JSON.stringify(newProfile));
+    }
     setAppState('scenarios');
   };
 
-  const handleSessionComplete = () => {
+  const handleSessionComplete = async (sessionData?: any) => {
     setUserProfile(prev => {
       const newProfile = { 
         ...prev, 
         sessionsCompleted: prev.sessionsCompleted + 1,
-        // Mocking some improvements for the MVP
         averageLatency: Math.max(1.5, prev.averageLatency > 0 ? prev.averageLatency * 0.95 : 2.8),
         fillerWordFrequency: Math.max(1.2, prev.fillerWordFrequency > 0 ? prev.fillerWordFrequency * 0.9 : 5.4)
       };
-      localStorage.setItem('userProfile', JSON.stringify(newProfile));
+      
+      if (user) {
+        saveUserProfile(user.uid, newProfile);
+        if (sessionData) {
+          saveSession(user.uid, sessionData);
+        }
+      } else {
+        localStorage.setItem('userProfile', JSON.stringify(newProfile));
+      }
+      
       return newProfile;
     });
   };
 
-  const handleResetProfile = () => {
-    localStorage.removeItem('userProfile');
-    setUserProfile({
-      level: null,
-      sessionsCompleted: 0,
-      averageLatency: 0,
-      fillerWordFrequency: 0
-    });
+  const handleResetProfile = async () => {
+    if (user) {
+      // For logged in users, we just reset the profile fields in Firestore
+      const resetProfile = {
+        level: null,
+        sessionsCompleted: 0,
+        averageLatency: 0,
+        fillerWordFrequency: 0
+      };
+      await saveUserProfile(user.uid, resetProfile);
+      setUserProfile(resetProfile);
+    } else {
+      localStorage.removeItem('userProfile');
+      setUserProfile({
+        level: null,
+        sessionsCompleted: 0,
+        averageLatency: 0,
+        fillerWordFrequency: 0
+      });
+    }
     setAppState('onboarding');
   };
+
+  const handleLogin = async () => {
+    try {
+      await signInWithGoogle();
+    } catch (error) {
+      console.error("Login failed", error);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      setAppState('onboarding');
+    } catch (error) {
+      console.error("Logout failed", error);
+    }
+  };
+
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <RefreshCw className="animate-spin text-indigo-600" size={48} />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-indigo-100">
@@ -132,7 +209,7 @@ export default function App() {
       <main className={`pb-24 md:pb-0 min-h-screen ${userProfile.level ? 'md:pl-20' : ''}`}>
         <AnimatePresence mode="wait">
           {appState === 'onboarding' && (
-            <Onboarding key="onboarding" onComplete={handleOnboardingComplete} />
+            <Onboarding key="onboarding" onComplete={handleOnboardingComplete} onLogin={handleLogin} user={user} />
           )}
           {appState === 'scenarios' && (
             <ScenarioSelection 
@@ -186,6 +263,8 @@ export default function App() {
               profile={userProfile}
               onBack={() => setAppState('scenarios')}
               onReset={handleResetProfile}
+              onLogout={handleLogout}
+              user={user}
             />
           )}
         </AnimatePresence>
@@ -222,7 +301,7 @@ IELTS Speaking Assessment Criteria:
 4. Pronunciation: Clarity of speech and use of phonological features.
 `;
 
-function Onboarding({ onComplete }: { onComplete: (level: ProficiencyLevel) => void, key?: string }) {
+function Onboarding({ onComplete, onLogin, user }: { onComplete: (level: ProficiencyLevel) => void, onLogin: () => void, user: User | null, key?: string }) {
   const [step, setStep] = useState<'welcome' | 'testing' | 'result'>('welcome');
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [responses, setResponses] = useState<string[]>([]);
@@ -326,7 +405,7 @@ function Onboarding({ onComplete }: { onComplete: (level: ProficiencyLevel) => v
           config: { responseMimeType: "application/json" }
         });
 
-        const result = JSON.parse(response.candidates?.[0]?.content?.parts?.[0]?.text || "{}");
+        const result = JSON.parse(response.text || "{}");
         setDetectedLevel(result.level);
         setStep('result');
       } catch (error) {
@@ -354,12 +433,24 @@ function Onboarding({ onComplete }: { onComplete: (level: ProficiencyLevel) => v
             </div>
             <h1 className="text-4xl font-display font-black tracking-tight mb-4 text-slate-900">IELTS Speaking Check</h1>
             <p className="text-slate-500 text-lg mb-12 leading-relaxed">Let's find your starting point. Answer 3 quick questions to get your IELTS-based level.</p>
-            <button 
-              onClick={() => setStep('testing')}
-              className="bg-brand-600 text-white px-10 py-4 rounded-2xl font-bold shadow-xl shadow-brand-100 hover:bg-brand-700 hover:scale-105 transition-all flex items-center gap-2 mx-auto"
-            >
-              Start Assessment <ChevronRight size={20} />
-            </button>
+            
+            <div className="flex flex-col gap-4 max-w-xs mx-auto">
+              <button 
+                onClick={() => setStep('testing')}
+                className="w-full bg-brand-600 text-white px-10 py-4 rounded-2xl font-bold shadow-xl shadow-brand-100 hover:bg-brand-700 hover:scale-105 transition-all flex items-center justify-center gap-2"
+              >
+                Start Assessment <ChevronRight size={20} />
+              </button>
+
+              {!user && (
+                <button 
+                  onClick={onLogin}
+                  className="w-full bg-white text-slate-900 border-2 border-slate-100 px-10 py-4 rounded-2xl font-bold hover:border-brand-100 hover:bg-brand-50/30 transition-all flex items-center justify-center gap-2"
+                >
+                  Sign in with Google
+                </button>
+              )}
+            </div>
           </motion.div>
         )}
 
@@ -593,7 +684,7 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
           }
         });
 
-        const data = JSON.parse(response.candidates?.[0]?.content?.parts?.[0]?.text || "{}");
+        const data = JSON.parse(response.text || "{}");
         setSubTopic(data.subTopic || "General Practice");
         setContext(data.context || "Practice your English in this real-life scenario.");
         setOpeningLine(data.openingLine || "Hello! Let's start our practice.");
@@ -707,7 +798,7 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
         }
       });
 
-      const data = JSON.parse(response.candidates?.[0]?.content?.parts?.[0]?.text || "{}");
+      const data = JSON.parse(response.text || "{}");
       
       const feedback = {
         original: text,
@@ -1052,7 +1143,7 @@ function DailyPractice({ userLevel, onBack, onComplete }: { userLevel: Proficien
         config: { responseMimeType: "application/json" }
       });
 
-      const data = JSON.parse(response.candidates?.[0]?.content?.parts?.[0]?.text || "{}");
+      const data = JSON.parse(response.text || "{}");
       setTopic(data.topic || "General Topic");
       setTips(data.tips || ["Focus on clarity", "Structure your points", "Keep a steady pace"]);
       setStep('practice');
@@ -1158,7 +1249,7 @@ function DailyPractice({ userLevel, onBack, onComplete }: { userLevel: Proficien
         config: { responseMimeType: "application/json" }
       });
 
-      setFeedback(JSON.parse(response.candidates?.[0]?.content?.parts?.[0]?.text || "{}"));
+      setFeedback(JSON.parse(response.text || "{}"));
     } catch (error) {
       console.error("Feedback Error:", error);
       setFeedback({
@@ -1368,7 +1459,7 @@ function DailyPractice({ userLevel, onBack, onComplete }: { userLevel: Proficien
     </div>
   );
 }
-function SettingsView({ profile, onBack, onReset }: { profile: UserProfile, onBack: () => void, onReset: () => void, key?: string }) {
+function SettingsView({ profile, onBack, onReset, onLogout, user }: { profile: UserProfile, onBack: () => void, onReset: () => void, onLogout: () => void, user: User | null, key?: string }) {
   const [showConfirmReset, setShowConfirmReset] = useState(false);
   const [diagStatus, setDiagStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [diagMessage, setDiagMessage] = useState("");
@@ -1417,6 +1508,31 @@ function SettingsView({ profile, onBack, onReset }: { profile: UserProfile, onBa
       </header>
 
       <div className="space-y-6">
+        <div className="p-8 bg-white border border-slate-100 rounded-[2.5rem] shadow-sm">
+          <h3 className="text-lg font-display font-bold mb-6 text-slate-900">Account</h3>
+          {user ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-4 mb-6">
+                {user.photoURL && (
+                  <img src={user.photoURL} alt={user.displayName || ""} className="w-12 h-12 rounded-full border-2 border-indigo-100" />
+                )}
+                <div>
+                  <p className="font-bold text-slate-900">{user.displayName}</p>
+                  <p className="text-xs text-slate-500">{user.email}</p>
+                </div>
+              </div>
+              <button 
+                onClick={onLogout}
+                className="w-full py-4 bg-white text-slate-900 border-2 border-slate-100 rounded-2xl font-bold hover:bg-slate-50 transition-all"
+              >
+                Sign Out
+              </button>
+            </div>
+          ) : (
+            <p className="text-slate-500 text-sm italic">Not signed in. Your data is stored locally.</p>
+          )}
+        </div>
+
         <div className="p-8 bg-white border border-slate-100 rounded-[2.5rem] shadow-sm">
           <h3 className="text-lg font-display font-bold mb-6 text-slate-900">Profile Information</h3>
           <div className="space-y-4">
@@ -1559,7 +1675,7 @@ function DailyVocab({ userLevel, onBack, onComplete }: { userLevel: ProficiencyL
         config: { responseMimeType: "application/json" }
       });
 
-      const data = JSON.parse(response.candidates?.[0]?.content?.parts?.[0]?.text || "{}");
+      const data = JSON.parse(response.text || "{}");
       setVocab(data.vocab || []);
       setChallenge(data.challenge || "Practice using these words in a few sentences.");
       setStep('practice');
@@ -1666,7 +1782,7 @@ function DailyVocab({ userLevel, onBack, onComplete }: { userLevel: ProficiencyL
         config: { responseMimeType: "application/json" }
       });
 
-      setFeedback(JSON.parse(response.candidates?.[0]?.content?.parts?.[0]?.text || "{}"));
+      setFeedback(JSON.parse(response.text || "{}"));
     } catch (error) {
       console.error("Vocab Feedback Error:", error);
       setFeedback({

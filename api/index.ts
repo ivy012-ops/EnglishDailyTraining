@@ -11,10 +11,14 @@ app.use(express.json());
 app.post("/api/ai/generate", async (req, res) => {
   try {
     const { model, contents, config } = req.body;
-    const apiKey = process.env.GEMINI_API_KEY;
+    let apiKey = process.env.GEMINI_API_KEY;
 
-    if (!apiKey) {
-      return res.status(500).json({ error: "GEMINI_API_KEY is not configured on the server." });
+    // Security check: If key is missing or placeholder, return a clear error
+    if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
+      return res.status(500).json({ 
+        error: "GEMINI_API_KEY is not configured.",
+        details: "Please set your Gemini API Key in the environment variables (Vercel) or AI Studio Secrets panel."
+      });
     }
 
     const ai = new GoogleGenAI({ apiKey });
@@ -24,13 +28,13 @@ app.post("/api/ai/generate", async (req, res) => {
       config
     });
 
-    res.json(response);
+    // Return the text directly to simplify frontend parsing
+    res.json({ text: response.text });
   } catch (error: any) {
     console.error("AI Proxy Error:", error);
     res.status(error.status || 500).json({ 
       error: error.message || "An error occurred during AI generation.",
-      details: error.details || null,
-      finishReason: error.finishReason || null
+      details: error.details || null
     });
   }
 });
@@ -39,8 +43,8 @@ app.post("/api/ai/generate", async (req, res) => {
 app.get("/api/diagnostics", async (req, res) => {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return res.json({ status: 'error', message: 'API Key Missing', details: 'GEMINI_API_KEY is not set on the server.' });
+    if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
+      return res.json({ status: 'error', message: 'API Key Missing', details: 'GEMINI_API_KEY is not set correctly.' });
     }
 
     const ai = new GoogleGenAI({ apiKey });
@@ -49,7 +53,7 @@ app.get("/api/diagnostics", async (req, res) => {
       contents: "Say 'OK'"
     });
 
-    if (response.text.includes("OK")) {
+    if (response.text?.includes("OK")) {
       res.json({ status: 'success', message: 'API Connection Successful' });
     } else {
       res.json({ status: 'error', message: 'Unexpected Response', details: response.text });
@@ -58,8 +62,7 @@ app.get("/api/diagnostics", async (req, res) => {
     res.json({ 
       status: 'error', 
       message: error.message || 'Connection Failed',
-      details: error.stack,
-      finishReason: error.finishReason
+      details: error.stack
     });
   }
 });
