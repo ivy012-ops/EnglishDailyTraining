@@ -56,6 +56,7 @@ export default function App() {
   const [selectedScenario, setSelectedScenario] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile>({
     level: null,
     sessionsCompleted: 0,
@@ -153,10 +154,18 @@ export default function App() {
   };
 
   const handleLogin = async () => {
+    setAuthError(null);
     try {
       await signInWithGoogle();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login failed", error);
+      if (error.code === 'auth/popup-blocked') {
+        setAuthError("The login popup was blocked. Please allow popups or open the app in a new tab.");
+      } else if (error.code === 'auth/unauthorized-domain') {
+        setAuthError("This domain is not authorized in Firebase. Please add it to the Authorized Domains list.");
+      } else {
+        setAuthError(error.message || "An unknown error occurred during login.");
+      }
     }
   };
 
@@ -209,7 +218,13 @@ export default function App() {
       <main className={`pb-24 md:pb-0 min-h-screen ${userProfile.level ? 'md:pl-20' : ''}`}>
         <AnimatePresence mode="wait">
           {appState === 'onboarding' && (
-            <Onboarding key="onboarding" onComplete={handleOnboardingComplete} onLogin={handleLogin} user={user} />
+            <Onboarding 
+              key="onboarding" 
+              onComplete={handleOnboardingComplete} 
+              onLogin={handleLogin} 
+              user={user} 
+              error={authError}
+            />
           )}
           {appState === 'scenarios' && (
             <ScenarioSelection 
@@ -301,7 +316,7 @@ IELTS Speaking Assessment Criteria:
 4. Pronunciation: Clarity of speech and use of phonological features.
 `;
 
-function Onboarding({ onComplete, onLogin, user }: { onComplete: (level: ProficiencyLevel) => void, onLogin: () => void, user: User | null, key?: string }) {
+function Onboarding({ onComplete, onLogin, user, error }: { onComplete: (level: ProficiencyLevel) => void, onLogin: () => void, user: User | null, error?: string | null, key?: string }) {
   const [step, setStep] = useState<'welcome' | 'testing' | 'result'>('welcome');
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [responses, setResponses] = useState<string[]>([]);
@@ -449,6 +464,13 @@ function Onboarding({ onComplete, onLogin, user }: { onComplete: (level: Profici
                 >
                   Sign in with Google
                 </button>
+              )}
+
+              {error && (
+                <div className="mt-4 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-start gap-3 text-left">
+                  <AlertCircle size={16} className="text-red-600 mt-0.5 shrink-0" />
+                  <p className="text-xs text-red-800 font-medium leading-relaxed">{error}</p>
+                </div>
               )}
             </div>
           </motion.div>
