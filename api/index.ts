@@ -30,7 +30,7 @@ app.post("/api/ai/generate", async (req, res) => {
     }
 
     const response = await ai.models.generateContent({
-      model: model || "gemini-2.0-flash",
+      model: model || "gemini-1.5-flash",
       contents: normalizedContents,
       config
     });
@@ -56,7 +56,7 @@ app.get("/api/diagnostics", async (req, res) => {
 
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-1.5-flash",
       contents: [{ role: 'user', parts: [{ text: "Say 'OK'" }] }]
     });
 
