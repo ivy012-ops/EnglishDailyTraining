@@ -26,18 +26,34 @@ import { FALLBACK_SCENARIOS, FALLBACK_TOPICS, FALLBACK_VOCAB } from './data/fall
 import { auth, signInWithGoogle, logout, saveUserProfile, getUserProfile, saveSession } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 
-// AI Proxy Helper
-async function callAI(params: { model?: string, contents: any, config?: any }) {
-  const response = await fetch('/api/ai/generate', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(params)
-  });
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'AI request failed');
+// AI Proxy Helper with Retry Logic
+async function callAI(params: { model?: string, contents: any, config?: any }, retries = 2, delay = 2000) {
+  try {
+    const response = await fetch('/api/ai/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params)
+    });
+
+    if (response.status === 429 && retries > 0) {
+      console.warn(`Rate limited. Retrying in ${delay}ms... (${retries} retries left)`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return callAI(params, retries - 1, delay * 2);
+    }
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'AI request failed');
+    }
+    return response.json();
+  } catch (error) {
+    if (retries > 0) {
+      console.warn(`Request failed. Retrying in ${delay}ms... (${retries} retries left)`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return callAI(params, retries - 1, delay * 2);
+    }
+    throw error;
   }
-  return response.json();
 }
 
 // Types
@@ -754,6 +770,18 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
   // Dynamic Topic Generation
   useEffect(() => {
     const initConversation = async () => {
+      // Check cache first
+      const cacheKey = `topic-${scenarioId}-${userLevel}`;
+      const cached = sessionStorage.getItem(cacheKey);
+      if (cached && refreshKey === 0) {
+        const data = JSON.parse(cached);
+        setSubTopic(data.subTopic);
+        setContext(data.context);
+        setOpeningLine(data.openingLine);
+        setIsProcessing(false);
+        return;
+      }
+
       setIsProcessing(true);
       try {
         const prompt = `Generate a UNIQUE and SPECIFIC sub-topic for English practice.
@@ -779,17 +807,35 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
         });
 
         const data = JSON.parse(response.text || "{}");
-        setSubTopic(data.subTopic || "General Practice");
-        setContext(data.context || "Practice your English in this real-life scenario.");
-        setOpeningLine(data.openingLine || "Hello! Let's start our practice.");
+        const finalData = {
+          subTopic: data.subTopic || "General Practice",
+          context: data.context || "Practice your English in this real-life scenario.",
+          openingLine: data.openingLine || "Hello! Let's start our practice."
+        };
+
+        setSubTopic(finalData.subTopic);
+        setContext(finalData.context);
+        setOpeningLine(finalData.openingLine);
+        
+        // Save to cache
+        sessionStorage.setItem(cacheKey, JSON.stringify(finalData));
+        
         setMessages([]); // Clear messages for new topic
         setHasStarted(false); // Reset start state
-      } catch (error) {
+      } catch (error: any) {
         console.error("Topic Gen Error:", error);
-        const fallback = scenarioId ? FALLBACK_SCENARIOS[scenarioId] : null;
-        setSubTopic(fallback?.subTopic || "General Practice");
-        setContext("Practice your English in this real-life scenario.");
-        setOpeningLine(fallback?.openingLine || "Hi! Let's start our practice session.");
+        
+        // If quota exceeded, show a specific message
+        if (error.message?.includes("quota") || error.message?.includes("429")) {
+          setSubTopic("Quota Reached");
+          setContext("You've hit the daily limit for AI practice. Please try again in a few hours or tomorrow!");
+          setOpeningLine("I'm resting my linguistic circuits right now. Let's talk again soon!");
+        } else {
+          const fallback = scenarioId ? FALLBACK_SCENARIOS[scenarioId] : null;
+          setSubTopic(fallback?.subTopic || "General Practice");
+          setContext("Practice your English in this real-life scenario.");
+          setOpeningLine(fallback?.openingLine || "Hi! Let's start our practice session.");
+        }
         setMessages([]);
         setHasStarted(false);
       } finally {
@@ -908,18 +954,27 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
         { role: 'ai', text: data.next_turn }
       ]);
       setUserInput("");
-    } catch (error) {
+    } catch (error: any) {
       console.error("AI Error:", error);
+      
+      let errorMessage = "I'm having a little trouble connecting to my linguistic analysis engine, but I'm still listening!";
+      let fallbackResponse = "That's interesting! Could you tell me more about that? (Note: Feedback is currently limited due to a connection issue)";
+      
+      if (error.message?.includes("quota") || error.message?.includes("429")) {
+        errorMessage = "Daily AI quota exceeded. I can still chat a bit, but I won't be able to provide detailed IELTS feedback until tomorrow.";
+        fallbackResponse = "I've reached my daily limit for deep analysis, but I'm still here to chat! What else is on your mind?";
+      }
+
       const fallbackFeedback = {
         original: text,
-        improved: text, // No improvement available
-        explanation: "I'm having a little trouble connecting to my linguistic analysis engine, but I'm still listening!",
+        improved: text, 
+        explanation: errorMessage,
         score: "N/A"
       };
       setMessages(prev => [
         ...prev, 
         { role: 'user', text, feedback: fallbackFeedback },
-        { role: 'ai', text: "That's interesting! Could you tell me more about that? (Note: Feedback is currently limited due to a connection issue)" }
+        { role: 'ai', text: fallbackResponse }
       ]);
       setUserInput("");
     } finally {
@@ -1242,6 +1297,18 @@ function DailyPractice({ userLevel, onBack, onComplete }: { userLevel: Proficien
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const generatePractice = async () => {
+    // Check cache
+    const cacheKey = `daily-practice-${userLevel}`;
+    const cached = sessionStorage.getItem(cacheKey);
+    if (cached && refreshKey === 0) {
+      const data = JSON.parse(cached);
+      setTopic(data.topic);
+      setTips(data.tips);
+      setStep('practice');
+      setIsProcessing(false);
+      return;
+    }
+
     setIsProcessing(true);
     setRefreshKey(prev => prev + 1);
     try {
@@ -1260,14 +1327,29 @@ function DailyPractice({ userLevel, onBack, onComplete }: { userLevel: Proficien
       });
 
       const data = JSON.parse(response.text || "{}");
-      setTopic(data.topic || "General Topic");
-      setTips(data.tips || ["Focus on clarity", "Structure your points", "Keep a steady pace"]);
+      const finalData = {
+        topic: data.topic || "General Topic",
+        tips: data.tips || ["Focus on clarity", "Structure your points", "Keep a steady pace"]
+      };
+
+      setTopic(finalData.topic);
+      setTips(finalData.tips);
+      
+      // Cache it
+      sessionStorage.setItem(cacheKey, JSON.stringify(finalData));
+      
       setStep('practice');
-    } catch (error) {
+    } catch (error: any) {
       console.error("Daily Practice Gen Error:", error);
-      const fallback = FALLBACK_TOPICS[Math.floor(Math.random() * FALLBACK_TOPICS.length)];
-      setTopic(fallback.topic);
-      setTips(fallback.tips);
+      
+      if (error.message?.includes("quota") || error.message?.includes("429")) {
+        setTopic("Daily Limit Reached");
+        setTips(["You've used all your AI credits for today.", "Try practicing with a friend!", "Come back tomorrow for new topics."]);
+      } else {
+        const fallback = FALLBACK_TOPICS[Math.floor(Math.random() * FALLBACK_TOPICS.length)];
+        setTopic(fallback.topic);
+        setTips(fallback.tips);
+      }
       setStep('practice');
     } finally {
       setIsProcessing(false);
@@ -1770,6 +1852,18 @@ function DailyVocab({ userLevel, onBack, onComplete }: { userLevel: ProficiencyL
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const generateVocab = async () => {
+    // Check cache
+    const cacheKey = `daily-vocab-${userLevel}`;
+    const cached = sessionStorage.getItem(cacheKey);
+    if (cached && refreshKey === 0) {
+      const data = JSON.parse(cached);
+      setVocab(data.vocab);
+      setChallenge(data.challenge);
+      setStep('practice');
+      setIsProcessing(false);
+      return;
+    }
+
     setIsProcessing(true);
     setRefreshKey(prev => prev + 1);
     try {
@@ -1792,14 +1886,33 @@ function DailyVocab({ userLevel, onBack, onComplete }: { userLevel: ProficiencyL
       });
 
       const data = JSON.parse(response.text || "{}");
-      setVocab(data.vocab || []);
-      setChallenge(data.challenge || "Practice using these words in a few sentences.");
+      const finalData = {
+        vocab: data.vocab || [],
+        challenge: data.challenge || "Practice using these words in a few sentences."
+      };
+
+      setVocab(finalData.vocab);
+      setChallenge(finalData.challenge);
+      
+      // Cache it
+      sessionStorage.setItem(cacheKey, JSON.stringify(finalData));
+      
       setStep('practice');
-    } catch (error) {
+    } catch (error: any) {
       console.error("Vocab Gen Error:", error);
-      const fallback = FALLBACK_VOCAB[Math.floor(Math.random() * FALLBACK_VOCAB.length)];
-      setVocab(fallback.vocab);
-      setChallenge(fallback.challenge);
+      
+      if (error.message?.includes("quota") || error.message?.includes("429")) {
+        setVocab([
+          { word: "Quota", meaning: "A fixed share of something that a person or group is entitled to receive or is bound to contribute", example: "The daily quota for AI requests has been reached." },
+          { word: "Exceed", meaning: "Be greater in number or size than", example: "The usage exceeded the current limit." },
+          { word: "Allocate", meaning: "Distribute (resources or duties) for a particular purpose", example: "More resources will be allocated tomorrow." }
+        ]);
+        setChallenge("Talk about a time you had to manage limited resources using these words.");
+      } else {
+        const fallback = FALLBACK_VOCAB[Math.floor(Math.random() * FALLBACK_VOCAB.length)];
+        setVocab(fallback.vocab);
+        setChallenge(fallback.challenge);
+      }
       setStep('practice');
     } finally {
       setIsProcessing(false);
