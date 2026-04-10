@@ -38,8 +38,11 @@ async function startServer() {
         normalizedContents = [{ role: 'user', parts: [{ text: contents }] }];
       }
 
+      const modelToUse = model || "gemini-flash-latest";
+      console.log(`Using AI Model: ${modelToUse}`);
+
       const response = await ai.models.generateContent({
-        model: model || "gemini-3-flash-preview",
+        model: modelToUse,
         contents: normalizedContents,
         config
       });
@@ -72,7 +75,7 @@ async function startServer() {
 
       const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-flash-latest",
         contents: [{ role: 'user', parts: [{ text: "Say 'OK'" }] }]
       });
 
