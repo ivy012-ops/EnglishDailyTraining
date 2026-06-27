@@ -25,6 +25,8 @@ import {
 import { FALLBACK_SCENARIOS, FALLBACK_TOPICS, FALLBACK_VOCAB } from './data/fallbacks';
 import { auth, signInWithGoogle, logout, saveUserProfile, getUserProfile, saveSession } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
+import { QuotaBar } from './components/QuotaBar';
+import { quotaService } from './services/quotaService';
 
 // AI Proxy Helper with Retry Logic
 async function callAI(params: { model?: string, contents: any, config?: any }, retries = 2, delay = 2000) {
@@ -74,6 +76,10 @@ export default function App() {
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
   const [showLevelUp, setShowLevelUp] = useState<{from: ProficiencyLevel, to: ProficiencyLevel} | null>(null);
+  // Quota state
+  const [quotaRemaining, setQuotaRemaining] = React.useState<number>(5);
+  const [quotaIsPaid, setQuotaIsPaid] = React.useState(false);
+
   const [userProfile, setUserProfile] = useState<UserProfile>({
     level: null,
     sessionsCompleted: 0,
@@ -107,6 +113,16 @@ export default function App() {
         } else {
           setAppState('onboarding');
         }
+      }
+      // Load quota
+      if (currentUser) {
+        try {
+          const q = await quotaService.getUserQuota(currentUser.uid);
+          if (q) {
+            setQuotaRemaining(Math.max(0, q.dailyLimit - q.dailyUsed));
+            setQuotaIsPaid(q.plan !== 'free');
+          }
+        } catch (e) { console.error('[Quota] load error', e); }
       }
       setIsAuthLoading(false);
     });
@@ -169,6 +185,15 @@ export default function App() {
       } catch (error) {
         console.error("Level check failed", error);
       }
+    }
+
+    // Consume quota after session
+    if (user) {
+      try {
+        await quotaService.consumeQuota(user.uid, 'conversation');
+        const q = await quotaService.getUserQuota(user.uid);
+        if (q) setQuotaRemaining(Math.max(0, q.dailyLimit - q.dailyUsed));
+      } catch (e) { console.error('[Quota] consume error', e); }
     }
 
     setUserProfile(updatedProfile);
@@ -314,7 +339,15 @@ export default function App() {
             <ScenarioSelection 
               key="scenarios" 
               userLevel={userProfile.level} 
-              onSelect={(id) => {
+              onSelect={async (id) => {
+                if (user && !quotaIsPaid) {
+                  const check = await quotaService.canStartSession(user.uid);
+                  if (!check.allowed) {
+                    alert('You\'ve used all 5 free sessions today!');
+                    return;
+                  }
+                }
+                {
                 setSelectedScenario(id);
                 setAppState('conversation');
               }} 
@@ -638,7 +671,7 @@ function Onboarding({ onComplete, onLogin, user, error }: { onComplete: (level: 
   );
 }
 
-function ScenarioSelection({ userLevel, onSelect, onDailyPractice, onDailyVocab, onReset, onSettings }: { userLevel: ProficiencyLevel, onSelect: (id: string) => void, onDailyPractice: () => void, onDailyVocab: () => void, onReset: () => void, onSettings: () => void, key?: string }) {
+function ScenarioSelection({ userLevel, userId, quotaRemaining, quotaIsPaid, onSelect, onDailyPractice, onDailyVocab, onReset, onSettings }: { userLevel: ProficiencyLevel, userId: string | null, quotaRemaining: number, quotaIsPaid: boolean, onSelect: (id: string) => void, onDailyPractice: () => void, onDailyVocab: () => void, onReset: () => void, onSettings: () => void, key?: string }) {
   const scenarios = [
     { id: 'meeting', title: 'Work Meeting', icon: <MessageSquare />, description: 'Discuss project updates with your team.', level: 'B2' },
     { id: 'interview', title: 'Job Interview', icon: <Award />, description: 'Practice answering common interview questions.', level: 'B2' },
@@ -653,6 +686,9 @@ function ScenarioSelection({ userLevel, onSelect, onDailyPractice, onDailyVocab,
       exit={{ opacity: 0 }}
       className="max-w-5xl mx-auto pt-12 pb-24 px-6"
     >
+      {/* Quota Progress Bar */}
+      <QuotaBar userId={userId} />
+
       <header className="mb-12 flex items-end justify-between">
         <div>
           <div className="flex items-center gap-2 text-brand-600 font-black text-[10px] uppercase tracking-[0.2em] mb-3">

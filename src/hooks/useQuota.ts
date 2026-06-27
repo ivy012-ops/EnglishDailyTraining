@@ -1,12 +1,11 @@
 // src/hooks/useQuota.ts
 import { useState, useEffect, useCallback } from 'react';
 import { quotaService, SessionType, UserQuota } from '../services/quotaService';
-import { useAuth } from './useAuth';
 
 export interface UseQuotaReturn {
   quota: UserQuota | null;
   canStart: boolean;
-  remaining: number;      // Infinity for paid users
+  remaining: number;
   isPaid: boolean;
   loading: boolean;
   error: string | null;
@@ -14,24 +13,25 @@ export interface UseQuotaReturn {
   consumeQuota: (type: SessionType) => Promise<void>;
 }
 
-export function useQuota(): UseQuotaReturn {
-  const { user } = useAuth();
-
-  const [quota, setQuota]       = useState<UserQuota | null>(null);
-  const [canStart, setCanStart] = useState(true);
+export function useQuota(userId: string | null): UseQuotaReturn {
+  const [quota, setQuota]         = useState<UserQuota | null>(null);
+  const [canStart, setCanStart]   = useState(true);
   const [remaining, setRemaining] = useState(5);
-  const [isPaid, setIsPaid]     = useState(false);
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState<string | null>(null);
+  const [isPaid, setIsPaid]       = useState(false);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState<string | null>(null);
 
   const checkQuota = useCallback(async (): Promise<boolean> => {
-    if (!user) return false;
+    if (!userId) {
+      setLoading(false);
+      return true; // No user — don't block
+    }
     try {
       setLoading(true);
       setError(null);
 
-      const result = await quotaService.canStartSession(user.uid);
-      const q      = await quotaService.getUserQuota(user.uid);
+      const result = await quotaService.canStartSession(userId);
+      const q      = await quotaService.getUserQuota(userId);
 
       setQuota(q);
       setCanStart(result.allowed);
@@ -40,45 +40,30 @@ export function useQuota(): UseQuotaReturn {
 
       return result.allowed;
     } catch (err) {
-      const msg = (err as Error).message;
-      setError(msg);
+      setError((err as Error).message);
       return false;
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [userId]);
 
-  // Load on mount and when user changes
   useEffect(() => {
-    if (user) {
-      checkQuota();
-    } else {
-      setLoading(false);
-    }
-  }, [user, checkQuota]);
+    checkQuota();
+  }, [checkQuota]);
 
   const consumeQuota = useCallback(
     async (type: SessionType): Promise<void> => {
-      if (!user) return;
+      if (!userId) return;
       try {
-        await quotaService.consumeQuota(user.uid, type);
-        await checkQuota(); // refresh state
+        await quotaService.consumeQuota(userId, type);
+        await checkQuota();
       } catch (err) {
         setError((err as Error).message);
         throw err;
       }
     },
-    [user, checkQuota]
+    [userId, checkQuota]
   );
 
-  return {
-    quota,
-    canStart,
-    remaining,
-    isPaid,
-    loading,
-    error,
-    checkQuota,
-    consumeQuota,
-  };
+  return { quota, canStart, remaining, isPaid, loading, error, checkQuota, consumeQuota };
 }
