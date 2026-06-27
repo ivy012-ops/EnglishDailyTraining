@@ -1,43 +1,32 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper Functions
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-    
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
-    }
 
-    // User Profile Validation
-    function isValidUserProfile(data) {
-      return data.keys().hasAll(['uid', 'level']) &&
-             data.uid is string &&
-             data.level in ['B1', 'B2', 'C1'] &&
-             (!('sessionsCompleted' in data) || data.sessionsCompleted is number) &&
-             (!('averageLatency' in data) || data.averageLatency is number) &&
-             (!('fillerWordFrequency' in data) || data.fillerWordFrequency is number);
-    }
-
-    // Practice Session Validation
-    function isValidSession(data) {
-      return data.keys().hasAll(['uid', 'timestamp']) &&
-             data.uid is string &&
-             data.uid == request.auth.uid;
-    }
-
-    // Rules
+    // Users can read/write only their own profile
     match /users/{userId} {
-      allow read: if isOwner(userId);
-      allow create: if isOwner(userId) && isValidUserProfile(request.resource.data);
-      allow update: if isOwner(userId) && isValidUserProfile(request.resource.data);
-      
-      match /sessions/{sessionId} {
-        allow read: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidSession(request.resource.data);
-      }
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Quotas: users can read their own; writes are server-only (except initial create)
+    match /quotas/{userId} {
+      allow read:   if request.auth != null && request.auth.uid == userId;
+      // Allow client to create their own quota document (first-time setup)
+      allow create: if request.auth != null && request.auth.uid == userId;
+      // All other writes must come from a trusted server (Admin SDK)
+      allow update, delete: if false;
+    }
+
+    // Sessions belong to the user who created them
+    match /sessions/{sessionId} {
+      allow read:   if request.auth != null && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      allow update, delete: if false;
+    }
+
+    // Shared content is readable by any authenticated user; only admins write
+    match /shared/{document=**} {
+      allow read:  if request.auth != null;
+      allow write: if false;
     }
   }
 }
