@@ -351,8 +351,26 @@ export default function App() {
                 setSelectedScenario(id);
                 setAppState('conversation');
               }} 
-              onDailyPractice={() => setAppState('daily-practice')}
-              onDailyVocab={() => setAppState('daily-vocab')}
+              onDailyPractice={async () => {
+                if (user && !quotaIsPaid) {
+                  const check = await quotaService.canStartSession(user.uid);
+                  if (!check.allowed) {
+                    alert('You\'ve used all 5 free sessions today! Come back tomorrow or upgrade.');
+                    return;
+                  }
+                }
+                setAppState('daily-practice');
+              }}
+              onDailyVocab={async () => {
+                if (user && !quotaIsPaid) {
+                  const check = await quotaService.canStartSession(user.uid);
+                  if (!check.allowed) {
+                    alert('You\'ve used all 5 free sessions today! Come back tomorrow or upgrade.');
+                    return;
+                  }
+                }
+                setAppState('daily-vocab');
+              }}
               onReset={handleResetProfile}
               onSettings={() => setAppState('settings')}
             />
