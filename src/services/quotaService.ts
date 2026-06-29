@@ -5,6 +5,8 @@ import {
   updateDoc,
   setDoc,
   increment,
+  collection,
+  getDocs,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -177,8 +179,35 @@ class QuotaService {
   async getPlatformStats(): Promise<PlatformStats | null> {
     try {
       const snap = await getDoc(STATS_DOC);
-      if (!snap.exists()) return null;
-      return snap.data() as PlatformStats;
+      if (snap.exists()) return snap.data() as PlatformStats;
+      // Doc doesn't exist yet — seed it from quota docs
+      return await this.seedPlatformStats();
+    } catch {
+      return null;
+    }
+  }
+
+  async seedPlatformStats(): Promise<PlatformStats | null> {
+    try {
+      const allQuotas = await getDocs(collection(db, 'quotas'));
+      let totalUsers = 0, totalSessionsAllTime = 0, freeUsers = 0, paidUsers = 0;
+      const sessionsByDay: Record<string, number> = {};
+
+      allQuotas.forEach(d => {
+        const q = d.data() as UserQuota;
+        totalUsers++;
+        totalSessionsAllTime += q.totalSessionsAllTime ?? 0;
+        if (q.plan === 'free') freeUsers++; else paidUsers++;
+        // Attribute all-time sessions to last session date as best approximation
+        if (q.lastSessionDate) {
+          const day = q.lastSessionDate.split('T')[0];
+          sessionsByDay[day] = (sessionsByDay[day] ?? 0) + (q.dailyUsed ?? 0);
+        }
+      });
+
+      const stats: PlatformStats = { totalUsers, totalSessionsAllTime, freeUsers, paidUsers, sessionsByDay };
+      await setDoc(STATS_DOC, stats, { merge: true });
+      return stats;
     } catch {
       return null;
     }
