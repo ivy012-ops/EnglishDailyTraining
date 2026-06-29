@@ -347,10 +347,9 @@ export default function App() {
                     return;
                   }
                 }
-                {
                 setSelectedScenario(id);
                 setAppState('conversation');
-              }} 
+              }}
               onDailyPractice={async () => {
                 if (user && !quotaIsPaid) {
                   const check = await quotaService.canStartSession(user.uid);
