@@ -268,8 +268,8 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-indigo-100">
-      {/* Navigation Bar */}
-      {userProfile.level && (
+      {/* Navigation Bar — show when logged in (even during onboarding so user can navigate away) */}
+      {user && (
         <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-6 py-3 flex justify-around items-center z-50 md:top-0 md:bottom-auto md:flex-col md:w-20 md:h-screen md:border-r md:border-t-0">
           <NavIcon 
             active={appState === 'scenarios'} 
@@ -295,7 +295,7 @@ export default function App() {
       )}
 
       {/* Main Content Area */}
-      <main className={`pb-24 md:pb-0 min-h-screen ${userProfile.level ? 'md:pl-20' : ''}`}>
+      <main className={`pb-24 md:pb-0 min-h-screen ${user ? 'md:pl-20' : ''}`}>
         <AnimatePresence>
           {showLevelUp && (
             <motion.div 
