@@ -82,6 +82,87 @@
   letter-spacing: 0.01em;
 }
 
+/* Info icon + tooltip */
+.qb-info {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.qb-info__icon {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #d1d5db;
+  color: #6b7280;
+  border: none;
+  font-size: 10px;
+  font-weight: 800;
+  font-style: italic;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transition: background 0.15s ease, color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.qb-info__icon:hover {
+  background: #6b7280;
+  color: #fff;
+}
+
+.qb-info__popup {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 260px;
+  background: #1e293b;
+  color: #f1f5f9;
+  border-radius: 12px;
+  padding: 14px 16px;
+  z-index: 100;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  pointer-events: none;
+}
+
+.qb-info__popup::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 6px solid #1e293b;
+}
+
+.qb-info__title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #94a3b8;
+  margin: 0 0 8px;
+}
+
+.qb-info__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.qb-info__list li {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #e2e8f0;
+}
+
 /* Upgrade button */
 .qb-strip__upgrade {
   margin-left: 4px;
