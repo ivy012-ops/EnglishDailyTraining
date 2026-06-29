@@ -4,8 +4,11 @@ import {
   getDoc,
   updateDoc,
   setDoc,
+  increment,
 } from 'firebase/firestore';
 import { db } from '../firebase';
+
+const STATS_DOC = doc(db, '_platform', 'stats');
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -35,6 +38,14 @@ export interface UserQuota {
   // Timestamps
   lastSessionDate: string;  // ISO string
   createdAt: string;
+}
+
+export interface PlatformStats {
+  totalUsers: number;
+  totalSessionsAllTime: number;
+  freeUsers: number;
+  paidUsers: number;
+  sessionsByDay: Record<string, number>;
 }
 
 export interface QuotaCheckResult {
@@ -128,6 +139,13 @@ class QuotaService {
       totalSessionsAllTime: quota.totalSessionsAllTime + 1,
       lastSessionDate: new Date().toISOString(),
     });
+    // Update platform stats
+    if (!isPreRecorded) {
+      await setDoc(STATS_DOC, {
+        totalSessionsAllTime: increment(1),
+        [`sessionsByDay.${todayUTC()}`]: increment(1),
+      }, { merge: true }).catch(() => {});
+    }
   }
 
   // ── Upgrade / Downgrade ───────────────────────────────────────────────────
@@ -143,6 +161,7 @@ class QuotaService {
       subscriptionEndDate: endDate.toISOString(),
       dailyLimit: Number.MAX_SAFE_INTEGER,
     });
+    await setDoc(STATS_DOC, { freeUsers: increment(-1), paidUsers: increment(1) }, { merge: true }).catch(() => {});
   }
 
   async downgradeToFree(userId: string): Promise<void> {
@@ -152,6 +171,17 @@ class QuotaService {
       dailyLimit: FREE_DAILY_LIMIT,
       subscriptionEndDate: null,
     });
+    await setDoc(STATS_DOC, { freeUsers: increment(1), paidUsers: increment(-1) }, { merge: true }).catch(() => {});
+  }
+
+  async getPlatformStats(): Promise<PlatformStats | null> {
+    try {
+      const snap = await getDoc(STATS_DOC);
+      if (!snap.exists()) return null;
+      return snap.data() as PlatformStats;
+    } catch {
+      return null;
+    }
   }
 
   // ── Private ───────────────────────────────────────────────────────────────
@@ -170,6 +200,13 @@ class QuotaService {
       createdAt: now,
     };
     await setDoc(doc(db, 'quotas', userId), quota);
+    // Track new user in platform stats
+    await setDoc(STATS_DOC, {
+      totalUsers: increment(1),
+      totalSessionsAllTime: increment(0),
+      freeUsers: increment(1),
+      paidUsers: increment(0),
+    }, { merge: true }).catch(() => {});
     return quota;
   }
 

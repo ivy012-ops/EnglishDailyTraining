@@ -26,6 +26,7 @@ import { FALLBACK_SCENARIOS, FALLBACK_TOPICS, FALLBACK_VOCAB } from './data/fall
 import { auth, signInWithGoogle, logout, saveUserProfile, getUserProfile, saveSession } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { QuotaBar } from './components/QuotaBar';
+import { AdminDashboard } from './components/AdminDashboard';
 import { quotaService } from './services/quotaService';
 
 // AI Proxy Helper with Retry Logic
@@ -59,7 +60,7 @@ async function callAI(params: { model?: string, contents: any, config?: any }, r
 }
 
 // Types
-type AppState = 'onboarding' | 'scenarios' | 'conversation' | 'dashboard' | 'daily-practice' | 'daily-vocab' | 'settings';
+type AppState = 'onboarding' | 'scenarios' | 'conversation' | 'dashboard' | 'daily-practice' | 'daily-vocab' | 'settings' | 'admin';
 type ProficiencyLevel = 'B1' | 'B2' | 'C1' | null;
 
 interface UserProfile {
@@ -413,13 +414,21 @@ export default function App() {
             />
           )}
           {appState === 'settings' && (
-            <SettingsView 
+            <SettingsView
               key="settings"
               profile={userProfile}
               onBack={() => setAppState('scenarios')}
               onReset={handleResetProfile}
               onLogout={handleLogout}
               user={user}
+              onAdminDashboard={() => setAppState('admin')}
+            />
+          )}
+          {appState === 'admin' && (
+            <AdminDashboard
+              key="admin"
+              user={user}
+              onBack={() => setAppState('settings')}
             />
           )}
         </AnimatePresence>
@@ -1687,7 +1696,7 @@ function DailyPractice({ userLevel, onBack, onComplete }: { userLevel: Proficien
     </div>
   );
 }
-function SettingsView({ profile, onBack, onReset, onLogout, user }: { profile: UserProfile, onBack: () => void, onReset: () => void, onLogout: () => void, user: User | null, key?: string }) {
+function SettingsView({ profile, onBack, onReset, onLogout, user, onAdminDashboard }: { profile: UserProfile, onBack: () => void, onReset: () => void, onLogout: () => void, user: User | null, onAdminDashboard?: () => void, key?: string }) {
   const [showConfirmReset, setShowConfirmReset] = useState(false);
   const [diagStatus, setDiagStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [diagMessage, setDiagMessage] = useState("");
@@ -1739,6 +1748,19 @@ function SettingsView({ profile, onBack, onReset, onLogout, user }: { profile: U
       </header>
 
       <div className="space-y-6">
+        {isAdmin && (
+          <button
+            onClick={onAdminDashboard}
+            className="w-full p-5 bg-slate-900 text-white rounded-[2rem] font-bold flex items-center justify-between hover:bg-slate-800 transition-all"
+          >
+            <span className="flex items-center gap-3">
+              <Activity size={20} />
+              Platform Dashboard
+            </span>
+            <span className="text-[10px] uppercase tracking-widest text-slate-400">Admin only</span>
+          </button>
+        )}
+
         <div className="p-8 bg-white border border-slate-100 rounded-[2.5rem] shadow-sm">
           <h3 className="text-lg font-display font-bold mb-6 text-slate-900">Account</h3>
           {user ? (
