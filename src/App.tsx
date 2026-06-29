@@ -80,6 +80,7 @@ export default function App() {
   // Quota state
   const [quotaRemaining, setQuotaRemaining] = React.useState<number>(5);
   const [quotaIsPaid, setQuotaIsPaid] = React.useState(false);
+  const [showQuotaModal, setShowQuotaModal] = React.useState(false);
 
   const [userProfile, setUserProfile] = useState<UserProfile>({
     level: null,
@@ -347,7 +348,7 @@ export default function App() {
                 if (user && !quotaIsPaid) {
                   const check = await quotaService.canStartSession(user.uid);
                   if (!check.allowed) {
-                    alert('You\'ve used all 5 free sessions today!');
+                    setShowQuotaModal(true);
                     return;
                   }
                 }
@@ -358,7 +359,7 @@ export default function App() {
                 if (user && !quotaIsPaid) {
                   const check = await quotaService.canStartSession(user.uid);
                   if (!check.allowed) {
-                    alert('You\'ve used all 5 free sessions today! Come back tomorrow or upgrade.');
+                    setShowQuotaModal(true);
                     return;
                   }
                 }
@@ -368,7 +369,7 @@ export default function App() {
                 if (user && !quotaIsPaid) {
                   const check = await quotaService.canStartSession(user.uid);
                   if (!check.allowed) {
-                    alert('You\'ve used all 5 free sessions today! Come back tomorrow or upgrade.');
+                    setShowQuotaModal(true);
                     return;
                   }
                 }
@@ -433,6 +434,28 @@ export default function App() {
           )}
         </AnimatePresence>
       </main>
+
+      {showQuotaModal && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:24 }}
+          onClick={() => setShowQuotaModal(false)}>
+          <div style={{ background:'#fff', borderRadius:24, padding:'32px 28px', maxWidth:360, width:'100%', textAlign:'center' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize:40, marginBottom:12 }}>⏰</div>
+            <h3 style={{ fontSize:20, fontWeight:700, color:'#0f172a', marginBottom:10 }}>Daily limit reached</h3>
+            <p style={{ fontSize:14, color:'#64748b', lineHeight:1.6, marginBottom:20 }}>
+              You've used all 5 free sessions today.<br />Come back tomorrow for a fresh set, or upgrade to Pro for unlimited sessions.
+            </p>
+            <div style={{ background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:12, padding:'12px 16px', marginBottom:20, fontSize:13, color:'#475569' }}>
+              🔄 Resets at <strong>midnight UTC</strong>
+            </div>
+            <button
+              onClick={() => setShowQuotaModal(false)}
+              style={{ width:'100%', padding:14, background:'#0f172a', color:'#fff', border:'none', borderRadius:12, fontSize:14, fontWeight:600, cursor:'pointer' }}>
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
