@@ -336,9 +336,12 @@ export default function App() {
             />
           )}
           {appState === 'scenarios' && (
-            <ScenarioSelection 
-              key="scenarios" 
-              userLevel={userProfile.level} 
+            <ScenarioSelection
+              key="scenarios"
+              userLevel={userProfile.level}
+              userId={user?.uid ?? null}
+              quotaRemaining={quotaRemaining}
+              quotaIsPaid={quotaIsPaid}
               onSelect={async (id) => {
                 if (user && !quotaIsPaid) {
                   const check = await quotaService.canStartSession(user.uid);
