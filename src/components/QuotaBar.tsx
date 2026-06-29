@@ -1,85 +1,68 @@
-// src/components/QuotaBar.tsx
 import React, { useEffect } from 'react';
 import { useQuota } from '../hooks/useQuota';
 import './QuotaBar.css';
 
 interface QuotaBarProps {
   userId: string | null;
+  refreshKey?: number;
   onUpgradeClick?: () => void;
 }
 
-export function QuotaBar({ userId, onUpgradeClick }: QuotaBarProps) {
+export function QuotaBar({ userId, refreshKey, onUpgradeClick }: QuotaBarProps) {
   const { quota, remaining, isPaid, loading, checkQuota } = useQuota(userId);
+
+  useEffect(() => {
+    checkQuota();
+  }, [checkQuota, refreshKey]);
 
   useEffect(() => {
     const id = setInterval(checkQuota, 60_000);
     return () => clearInterval(id);
   }, [checkQuota]);
 
-  if (!userId || loading) {
-    return loading ? <div className="qb-skeleton" aria-busy="true" /> : null;
-  }
+  if (!userId || loading) return null;
 
-  // ── Paid users ────────────────────────────────────────────────────────────
   if (isPaid) {
     return (
-      <div className="qb-root qb-paid" role="status">
-        <span className="qb-badge">✨ Unlimited Sessions</span>
-        <p className="qb-paid-text">Practice as much as you like — no limits.</p>
+      <div className="qb-strip qb-strip--paid" role="status">
+        <span className="qb-strip__icon">✨</span>
+        <span className="qb-strip__label">Unlimited sessions</span>
       </div>
     );
   }
 
-  // ── Free users ────────────────────────────────────────────────────────────
-  const limit   = quota?.dailyLimit ?? 5;
-  const used    = quota?.dailyUsed  ?? 0;
-  const pct     = Math.min((used / limit) * 100, 100);
+  const limit = quota?.dailyLimit ?? 5;
+  const used = quota?.dailyUsed ?? 0;
   const isMaxed = remaining <= 0;
-  const isWarn  = remaining === 1;
+  const isWarn = remaining === 1;
 
   return (
     <div
-      className={`qb-root qb-free${isMaxed ? ' qb-maxed' : ''}${isWarn ? ' qb-warning' : ''}`}
+      className={`qb-strip${isMaxed ? ' qb-strip--maxed' : isWarn ? ' qb-strip--warn' : ''}`}
       role="status"
-      aria-label={`${remaining} of ${limit} practice sessions remaining today`}
+      aria-label={`${remaining} of ${limit} sessions remaining today`}
     >
-      <div className="qb-header">
-        <span className="qb-label">Today's AI Sessions</span>
-        <span className="qb-counter">{used} / {limit}</span>
-      </div>
-
-      <div className="qb-bar-track" role="progressbar" aria-valuenow={used} aria-valuemin={0} aria-valuemax={limit}>
-        <div
-          className={`qb-bar-fill${isMaxed ? ' qb-bar-fill--maxed' : ''}`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-
-      <div className="qb-bubbles" aria-hidden="true">
+      <div className="qb-strip__dots">
         {Array.from({ length: limit }).map((_, i) => (
-          <div key={i} className={`qb-bubble${i < used ? ' qb-bubble--used' : ' qb-bubble--free'}`}>
-            {i < used ? '✓' : String(i + 1)}
-          </div>
+          <span
+            key={i}
+            className={`qb-dot${i < used ? ' qb-dot--used' : ''}`}
+            aria-hidden="true"
+          />
         ))}
       </div>
 
-      <div className={`qb-msg${isMaxed ? ' qb-msg--maxed' : isWarn ? ' qb-msg--warn' : ' qb-msg--ok'}`}>
+      <span className="qb-strip__label">
         {isMaxed
-          ? <>🔒 All sessions used. Resets tomorrow or <strong>upgrade to Pro</strong>.</>
-          : isWarn
-          ? <>⚠️ Only <strong>1 session</strong> left today — make it count!</>
-          : <>🎯 <strong>{remaining} sessions</strong> left today. Keep practising!</>
-        }
-      </div>
+          ? 'Daily limit reached'
+          : `${remaining} session${remaining !== 1 ? 's' : ''} left today`}
+      </span>
 
       {isMaxed && (
-        <button className="qb-upgrade-btn" onClick={onUpgradeClick}>
-          Upgrade to Pro — Unlimited Sessions →
+        <button className="qb-strip__upgrade" onClick={onUpgradeClick}>
+          Upgrade →
         </button>
       )}
-
-      <p className="qb-streak">🔥 Practise every day to keep your streak alive!</p>
-      <p className="qb-reset">Sessions reset at midnight UTC.</p>
     </div>
   );
 }

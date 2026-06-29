@@ -1,270 +1,103 @@
-/* src/components/QuotaBar.css */
+/* QuotaBar — compact horizontal strip */
 
-/* ── Root ──────────────────────────────────────────────────────────────────── */
-
-.qb-root {
-  width: 100%;
-  max-width: 480px;
-  margin: 1.5rem auto;
-  border-radius: 18px;
-  padding: 1.25rem 1.5rem;
-  font-family: inherit;
-  animation: qb-slide-in 0.45s ease;
+.qb-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: 100px;
+  background: #f8f8f8;
+  border: 1.5px solid #e5e5e5;
+  width: fit-content;
+  margin-bottom: 24px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #555;
+  animation: qb-fade-in 0.3s ease;
 }
 
-@keyframes qb-slide-in {
-  from { opacity: 0; transform: translateY(-14px); }
+@keyframes qb-fade-in {
+  from { opacity: 0; transform: translateY(-6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ── Paid ──────────────────────────────────────────────────────────────────── */
-
-.qb-paid {
-  background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%);
-  border: 2px solid #52a675;
-  text-align: center;
+.qb-strip--paid {
+  background: #f0faf4;
+  border-color: #6fcf97;
+  color: #27ae60;
 }
 
-.qb-badge {
-  display: inline-block;
-  background: linear-gradient(135deg, #52a675, #78c99c);
-  color: #fff;
-  padding: 0.35rem 1.1rem;
-  border-radius: 20px;
-  font-size: 0.9rem;
-  font-weight: 700;
-  margin-bottom: 0.5rem;
+.qb-strip--warn {
+  background: #fffbf0;
+  border-color: #f6c76a;
+  color: #b7791f;
 }
 
-.qb-paid-text {
-  margin: 0;
-  color: #22543d;
-  font-size: 0.95rem;
-  font-weight: 500;
-}
-
-/* ── Free ──────────────────────────────────────────────────────────────────── */
-
-.qb-free {
-  background: linear-gradient(135deg, #faf8f5 0%, #fff9f5 100%);
-  border: 2px solid #e8956c;
-}
-
-.qb-free.qb-maxed {
-  border-color: #d85d5d;
-  background: linear-gradient(135deg, #fff5f5 0%, #fff0f0 100%);
-}
-
-.qb-free.qb-warning {
-  border-color: #f6ad55;
-  background: linear-gradient(135deg, #fffaf0 0%, #fff7e6 100%);
-}
-
-/* ── Header ────────────────────────────────────────────────────────────────── */
-
-.qb-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.85rem;
-}
-
-.qb-label {
-  font-weight: 600;
-  font-size: 0.9rem;
-  color: #2c3e50;
-}
-
-.qb-counter {
-  background: #e8956c;
-  color: #fff;
-  padding: 0.2rem 0.7rem;
-  border-radius: 20px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-}
-
-.qb-maxed .qb-counter { background: #d85d5d; }
-.qb-warning .qb-counter { background: #dd6b20; }
-
-/* ── Progress bar ──────────────────────────────────────────────────────────── */
-
-.qb-bar-track {
-  width: 100%;
-  height: 10px;
-  background: #e5e1db;
-  border-radius: 100px;
-  overflow: hidden;
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.qb-bar-fill {
-  height: 100%;
-  border-radius: 100px;
-  background: linear-gradient(90deg, #52a675 0%, #78c99c 100%);
-  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  overflow: hidden;
-}
-
-/* shimmer on active fill */
-.qb-bar-fill::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.35) 50%, transparent 100%);
-  animation: qb-shimmer 2s linear infinite;
-}
-
-.qb-bar-fill--maxed {
-  background: linear-gradient(90deg, #d85d5d 0%, #e07a7a 100%);
-}
-
-@keyframes qb-shimmer {
-  from { transform: translateX(-100%); }
-  to   { transform: translateX(100%); }
-}
-
-/* ── Bubbles ───────────────────────────────────────────────────────────────── */
-
-.qb-bubbles {
-  display: flex;
-  justify-content: flex-start;
-  gap: 0.5rem;
-  margin: 0.85rem 0;
-  flex-wrap: wrap;
-}
-
-.qb-bubble {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 0.85rem;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  user-select: none;
-}
-
-.qb-bubble--free {
-  background: #fff;
-  border: 2px solid #e8956c;
-  color: #e8956c;
-}
-
-.qb-bubble--free:hover {
-  transform: scale(1.1);
-  box-shadow: 0 4px 10px rgba(232, 149, 108, 0.25);
-}
-
-.qb-bubble--used {
-  background: linear-gradient(135deg, #52a675, #78c99c);
-  border: 2px solid #52a675;
-  color: #fff;
-  animation: qb-pop-in 0.4s ease;
-}
-
-.qb-maxed .qb-bubble--used {
-  background: linear-gradient(135deg, #d85d5d, #e07a7a);
-  border-color: #d85d5d;
-}
-
-@keyframes qb-pop-in {
-  0%   { transform: scale(0.7); opacity: 0; }
-  55%  { transform: scale(1.15); }
-  100% { transform: scale(1);   opacity: 1; }
-}
-
-/* ── Status message ────────────────────────────────────────────────────────── */
-
-.qb-msg {
-  padding: 0.7rem 1rem;
-  border-radius: 10px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  margin: 0.5rem 0;
-}
-
-.qb-msg--ok {
-  background: #f0fff4;
-  border: 1px solid #c6f6d5;
-  color: #22543d;
-}
-
-.qb-msg--warn {
-  background: #fffaf0;
-  border: 1px solid #fbd38d;
-  color: #744210;
-}
-
-.qb-msg--maxed {
+.qb-strip--maxed {
   background: #fff5f5;
-  border: 1px solid #fed7d7;
-  color: #742a2a;
+  border-color: #fc8181;
+  color: #c53030;
 }
 
-/* ── Upgrade button ────────────────────────────────────────────────────────── */
+/* Dots */
+.qb-strip__dots {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
 
-.qb-upgrade-btn {
-  display: block;
-  width: 100%;
-  margin: 0.75rem 0 0.25rem;
-  padding: 0.85rem 1rem;
-  background: linear-gradient(135deg, #e8956c, #ffab7a);
-  color: #fff;
-  border: none;
-  border-radius: 12px;
-  font-size: 0.95rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  box-shadow: 0 4px 12px rgba(232, 149, 108, 0.3);
+.qb-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #e0e0e0;
+  border: 1.5px solid #ccc;
+  transition: background 0.25s ease, border-color 0.25s ease;
+}
+
+.qb-dot--used {
+  background: #3b82f6;
+  border-color: #2563eb;
+}
+
+.qb-strip--warn .qb-dot--used {
+  background: #f59e0b;
+  border-color: #d97706;
+}
+
+.qb-strip--maxed .qb-dot--used {
+  background: #ef4444;
+  border-color: #dc2626;
+}
+
+/* Icon */
+.qb-strip__icon {
+  font-size: 13px;
+  line-height: 1;
+}
+
+/* Label */
+.qb-strip__label {
+  white-space: nowrap;
   letter-spacing: 0.01em;
 }
 
-.qb-upgrade-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(232, 149, 108, 0.4);
+/* Upgrade button */
+.qb-strip__upgrade {
+  margin-left: 4px;
+  padding: 3px 10px;
+  border-radius: 100px;
+  background: #3b82f6;
+  color: #fff;
+  border: none;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: background 0.2s ease;
+  white-space: nowrap;
 }
 
-.qb-upgrade-btn:active {
-  transform: translateY(0);
-}
-
-/* ── Footer text ───────────────────────────────────────────────────────────── */
-
-.qb-streak {
-  margin: 0.6rem 0 0.2rem;
-  font-size: 0.82rem;
-  color: #5a6c7d;
-  text-align: center;
-}
-
-.qb-reset {
-  margin: 0;
-  font-size: 0.75rem;
-  color: #8a9bb0;
-  text-align: center;
-  font-style: italic;
-}
-
-/* ── Loading skeleton ──────────────────────────────────────────────────────── */
-
-.qb-skeleton {
-  width: 100%;
-  max-width: 480px;
-  height: 160px;
-  margin: 1.5rem auto;
-  border-radius: 18px;
-  background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
-  background-size: 200% 100%;
-  animation: qb-shimmer-bg 1.4s linear infinite;
-}
-
-@keyframes qb-shimmer-bg {
-  from { background-position: 200% 0; }
-  to   { background-position: -200% 0; }
+.qb-strip__upgrade:hover {
+  background: #2563eb;
 }

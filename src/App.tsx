@@ -707,7 +707,7 @@ function ScenarioSelection({ userLevel, userId, quotaRemaining, quotaIsPaid, onS
       className="max-w-5xl mx-auto pt-12 pb-24 px-6"
     >
       {/* Quota Progress Bar */}
-      <QuotaBar userId={userId} />
+      <QuotaBar userId={userId} refreshKey={quotaRemaining} />
 
       <header className="mb-12 flex items-end justify-between">
         <div>
@@ -959,7 +959,7 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
     if (isFinished) return;
     setIsProcessing(true);
     try {
-      const history = messages.map(m => `${m.role.toUpperCase()}: ${m.text}`).join('\n');
+      const history = messages.slice(-6).map(m => `${m.role.toUpperCase()}: ${m.text}`).join('\n');
       
       const prompt = `
         Role: English tutor for a ${userLevel} learner.
@@ -1014,7 +1014,7 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
       console.error("AI Error:", error);
       
       let errorMessage = "I'm having a little trouble connecting to my linguistic analysis engine, but I'm still listening!";
-      let fallbackResponse = "That's interesting! Could you tell me more about that? (Note: Feedback is currently limited due to a connection issue)";
+      let fallbackResponse = "That's a great point! Could you expand on that a little more?";
       
       if (error.message?.includes("quota") || error.message?.includes("429")) {
         errorMessage = "Daily AI quota exceeded. I can still chat a bit, but I won't be able to provide detailed IELTS feedback until tomorrow.";
@@ -1352,60 +1352,34 @@ function DailyPractice({ userLevel, onBack, onComplete }: { userLevel: Proficien
   const recognitionRef = useRef<any>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const generatePractice = async () => {
-    // Check cache
-    const cacheKey = `daily-practice-${userLevel}`;
-    const cached = sessionStorage.getItem(cacheKey);
-    if (cached && refreshKey === 0) {
-      const data = JSON.parse(cached);
-      setTopic(data.topic);
-      setTips(data.tips);
+  const generatePractice = async (forceAI = false) => {
+    // Use local topic instantly unless user explicitly regenerates
+    if (!forceAI) {
+      const pick = FALLBACK_TOPICS[Math.floor(Math.random() * FALLBACK_TOPICS.length)];
+      setTopic(pick.topic);
+      setTips(pick.tips);
       setStep('practice');
-      setIsProcessing(false);
       return;
     }
 
+    // AI regenerate path (only on explicit "Regenerate" click)
     setIsProcessing(true);
     setRefreshKey(prev => prev + 1);
     try {
-      const prompt = `Generate a random impromptu speech topic and 3 extremely short, clean, actionable tips (max 10 words each).
-      
-      Return ONLY a JSON object:
-      {
-        "topic": "A specific, interesting topic",
-        "tips": ["Short tip 1", "Short tip 2", "Short tip 3"]
-      }`;
-
+      const prompt = `Generate a random impromptu speech topic and 3 extremely short, clean, actionable tips (max 10 words each). Return ONLY JSON: {"topic": "...", "tips": ["...","...","..."]}`;
       const response = await callAI({
         model: "gemini-flash-latest",
         contents: prompt,
         config: { responseMimeType: "application/json" }
       });
-
       const data = JSON.parse(response.text || "{}");
-      const finalData = {
-        topic: data.topic || "General Topic",
-        tips: data.tips || ["Focus on clarity", "Structure your points", "Keep a steady pace"]
-      };
-
-      setTopic(finalData.topic);
-      setTips(finalData.tips);
-      
-      // Cache it
-      sessionStorage.setItem(cacheKey, JSON.stringify(finalData));
-      
+      setTopic(data.topic || FALLBACK_TOPICS[0].topic);
+      setTips(data.tips || FALLBACK_TOPICS[0].tips);
       setStep('practice');
-    } catch (error: any) {
-      console.error("Daily Practice Gen Error:", error);
-      
-      if (error.message?.includes("quota") || error.message?.includes("429")) {
-        setTopic("Daily Limit Reached");
-        setTips(["You've used all your AI credits for today.", "Try practicing with a friend!", "Come back tomorrow for new topics."]);
-      } else {
-        const fallback = FALLBACK_TOPICS[Math.floor(Math.random() * FALLBACK_TOPICS.length)];
-        setTopic(fallback.topic);
-        setTips(fallback.tips);
-      }
+    } catch {
+      const pick = FALLBACK_TOPICS[Math.floor(Math.random() * FALLBACK_TOPICS.length)];
+      setTopic(pick.topic);
+      setTips(pick.tips);
       setStep('practice');
     } finally {
       setIsProcessing(false);
@@ -1565,11 +1539,11 @@ function DailyPractice({ userLevel, onBack, onComplete }: { userLevel: Proficien
                 </div>
                 <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Time Remaining</p>
               </div>
-              <button 
-                onClick={generatePractice}
+              <button
+                onClick={() => generatePractice(true)}
                 disabled={isProcessing || timerActive}
                 className="p-3 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-2xl transition-all disabled:opacity-0"
-                title="Regenerate Topic"
+                title="Regenerate Topic (AI)"
               >
                 <RefreshCw size={20} className={isProcessing ? 'animate-spin' : ''} />
               </button>
@@ -1744,6 +1718,9 @@ function SettingsView({ profile, onBack, onReset, onLogout, user }: { profile: U
     }
   };
 
+  const ADMIN_EMAILS = ['thisisbaebae@gmail.com'];
+  const isAdmin = ADMIN_EMAILS.includes(user?.email || '');
+
   return (
     <motion.div 
       initial={{ opacity: 0, x: 20 }}
@@ -1801,7 +1778,7 @@ function SettingsView({ profile, onBack, onReset, onLogout, user }: { profile: U
           </div>
         </div>
 
-        <div className="p-8 bg-white border border-slate-100 rounded-[2.5rem] shadow-sm">
+        {isAdmin && <div className="p-8 bg-white border border-slate-100 rounded-[2.5rem] shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-display font-bold text-slate-900">API Diagnostics</h3>
             <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
@@ -1854,7 +1831,7 @@ function SettingsView({ profile, onBack, onReset, onLogout, user }: { profile: U
           >
             <Activity size={18} /> Run Connection Test
           </button>
-        </div>
+        </div>}
 
         <div className="p-8 bg-white border border-slate-100 rounded-[2.5rem] shadow-sm">
           <h3 className="text-lg font-display font-bold mb-4 text-red-600">Danger Zone</h3>
