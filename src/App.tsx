@@ -20,13 +20,15 @@ import {
   RefreshCw,
   Activity,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Star
 } from 'lucide-react';
 import { FALLBACK_SCENARIOS, FALLBACK_TOPICS, FALLBACK_VOCAB } from './data/fallbacks';
 import { auth, signInWithGoogle, logout, saveUserProfile, getUserProfile, saveSession } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { QuotaBar } from './components/QuotaBar';
 import { AdminDashboard } from './components/AdminDashboard';
+import { ScoringGuide } from './components/ScoringGuide';
 import { quotaService } from './services/quotaService';
 
 // AI Proxy Helper with Retry Logic
@@ -60,7 +62,7 @@ async function callAI(params: { model?: string, contents: any, config?: any }, r
 }
 
 // Types
-type AppState = 'onboarding' | 'scenarios' | 'conversation' | 'dashboard' | 'daily-practice' | 'daily-vocab' | 'settings' | 'admin';
+type AppState = 'onboarding' | 'scenarios' | 'conversation' | 'dashboard' | 'daily-practice' | 'daily-vocab' | 'settings' | 'admin' | 'scoring-guide';
 type ProficiencyLevel = 'B1' | 'B2' | 'C1' | null;
 
 interface UserProfile {
@@ -277,11 +279,17 @@ export default function App() {
             icon={<BookOpen size={24} />} 
             label="Practice" 
           />
-          <NavIcon 
-            active={appState === 'dashboard'} 
-            onClick={() => setAppState('dashboard')} 
-            icon={<LayoutDashboard size={24} />} 
-            label="Stats" 
+          <NavIcon
+            active={appState === 'dashboard'}
+            onClick={() => setAppState('dashboard')}
+            icon={<LayoutDashboard size={24} />}
+            label="Stats"
+          />
+          <NavIcon
+            active={appState === 'scoring-guide'}
+            onClick={() => setAppState('scoring-guide')}
+            icon={<Star size={24} />}
+            label="Scoring"
           />
           <div className="hidden md:flex flex-col gap-6 mt-auto pb-6">
             <NavIcon 
@@ -430,6 +438,12 @@ export default function App() {
               key="admin"
               user={user}
               onBack={() => setAppState('settings')}
+            />
+          )}
+          {appState === 'scoring-guide' && (
+            <ScoringGuide
+              key="scoring-guide"
+              onBack={() => setAppState('scenarios')}
             />
           )}
         </AnimatePresence>
