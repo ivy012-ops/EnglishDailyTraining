@@ -393,8 +393,8 @@ export default function App() {
               userLevel={userProfile.level} 
               scenarioId={selectedScenario}
               onBack={() => setAppState('scenarios')} 
-              onComplete={(data) => {
-                handleSessionComplete(data);
+              onComplete={async (data) => {
+                await handleSessionComplete(data);
                 setAppState('scenarios');
               }}
             />
@@ -1499,8 +1499,8 @@ function DailyPractice({ userLevel, onBack, onComplete }: { userLevel: Proficien
     setTimerActive(false);
     setIsProcessing(true);
     setStep('feedback');
-    onComplete();
-    
+    onComplete({ messages: [{ role: 'user', text: userInput }] });
+
     try {
       const prompt = `Analyze this impromptu speech on the topic "${topic}".
       User speech: "${userInput}"
@@ -2078,8 +2078,8 @@ function DailyVocab({ userLevel, onBack, onComplete }: { userLevel: ProficiencyL
     setTimerActive(false);
     setIsProcessing(true);
     setStep('feedback');
-    onComplete();
-    
+    onComplete({ messages: [{ role: 'user', text: userInput }] });
+
     try {
       const prompt = `Analyze these sentences using the target vocabulary.
       Words: ${vocab.map(v => v.word).join(", ")}
