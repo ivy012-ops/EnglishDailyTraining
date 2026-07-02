@@ -62,14 +62,24 @@ async function callAI(params: { model?: string, contents: any, config?: any }, r
 }
 
 // Types
-type AppState = 'onboarding' | 'scenarios' | 'conversation' | 'dashboard' | 'daily-practice' | 'daily-vocab' | 'settings' | 'admin' | 'scoring-guide';
+type AppState = 'onboarding' | 'scenarios' | 'conversation' | 'conversation-result' | 'dashboard' | 'daily-practice' | 'daily-vocab' | 'settings' | 'admin' | 'scoring-guide';
 type ProficiencyLevel = 'B1' | 'B2' | 'C1' | null;
+
+interface SessionRecord {
+  date: string;
+  scenario: string;
+  topic: string;
+  turns: number;
+  avgScore: number | null;
+  sessionType: 'conversation' | 'impromptu' | 'vocab';
+}
 
 interface UserProfile {
   level: ProficiencyLevel;
   sessionsCompleted: number;
   averageLatency: number;
   fillerWordFrequency: number;
+  sessionHistory: SessionRecord[];
 }
 
 export default function App() {
@@ -88,8 +98,10 @@ export default function App() {
     level: null,
     sessionsCompleted: 0,
     averageLatency: 0,
-    fillerWordFrequency: 0
+    fillerWordFrequency: 0,
+    sessionHistory: []
   });
+  const [conversationResult, setConversationResult] = React.useState<any>(null);
 
   // Firebase Auth Listener
   useEffect(() => {
@@ -102,7 +114,8 @@ export default function App() {
             level: profile.level,
             sessionsCompleted: profile.sessionsCompleted || 0,
             averageLatency: profile.averageLatency || 0,
-            fillerWordFrequency: profile.fillerWordFrequency || 0
+            fillerWordFrequency: profile.fillerWordFrequency || 0,
+            sessionHistory: profile.sessionHistory || []
           });
           setAppState('scenarios');
         } else {
@@ -147,10 +160,26 @@ export default function App() {
 
   const handleSessionComplete = async (sessionData?: any) => {
     // 1. Update stats
-    const updatedProfile = { ...userProfile };
+    const updatedProfile = { ...userProfile, sessionHistory: [...(userProfile.sessionHistory || [])] };
     updatedProfile.sessionsCompleted += 1;
     updatedProfile.averageLatency = Math.max(1.5, userProfile.averageLatency > 0 ? userProfile.averageLatency * 0.95 : 2.8);
     updatedProfile.fillerWordFrequency = Math.max(1.2, userProfile.fillerWordFrequency > 0 ? userProfile.fillerWordFrequency * 0.9 : 5.4);
+
+    // Record session in history
+    if (sessionData) {
+      const userMsgs = (sessionData.messages || []).filter((m: any) => m.role === 'user');
+      const scores = userMsgs.filter((m: any) => m.feedback?.score && m.feedback.score !== 'N/A').map((m: any) => parseFloat(m.feedback.score));
+      const avgScore = scores.length ? parseFloat((scores.reduce((a: number, b: number) => a + b, 0) / scores.length).toFixed(1)) : null;
+      const record: SessionRecord = {
+        date: new Date().toISOString(),
+        scenario: sessionData.scenario || sessionData.sessionType || 'practice',
+        topic: sessionData.topic || '',
+        turns: userMsgs.length,
+        avgScore,
+        sessionType: sessionData.sessionType || (sessionData.scenario ? 'conversation' : 'impromptu'),
+      };
+      updatedProfile.sessionHistory = [record, ...updatedProfile.sessionHistory].slice(0, 30);
+    }
 
     // 2. Check for Level Up (only if not already C1)
     if (sessionData && userProfile.level !== 'C1') {
@@ -219,7 +248,8 @@ export default function App() {
         level: null,
         sessionsCompleted: 0,
         averageLatency: 0,
-        fillerWordFrequency: 0
+        fillerWordFrequency: 0,
+        sessionHistory: []
       };
       await saveUserProfile(user.uid, resetProfile);
       setUserProfile(resetProfile);
@@ -229,7 +259,8 @@ export default function App() {
         level: null,
         sessionsCompleted: 0,
         averageLatency: 0,
-        fillerWordFrequency: 0
+        fillerWordFrequency: 0,
+        sessionHistory: []
       });
     }
     setAppState('onboarding');
@@ -388,15 +419,23 @@ export default function App() {
             />
           )}
           {appState === 'conversation' && (
-            <Conversation 
-              key={`conversation-${selectedScenario}`} 
-              userLevel={userProfile.level} 
+            <Conversation
+              key={`conversation-${selectedScenario}`}
+              userLevel={userProfile.level}
               scenarioId={selectedScenario}
-              onBack={() => setAppState('scenarios')} 
+              onBack={() => setAppState('scenarios')}
               onComplete={async (data) => {
+                setConversationResult(data);
                 await handleSessionComplete(data);
-                setAppState('scenarios');
+                setAppState('conversation-result');
               }}
+            />
+          )}
+          {appState === 'conversation-result' && conversationResult && (
+            <ConversationResult
+              key="conversation-result"
+              data={conversationResult}
+              onBack={() => { setConversationResult(null); setAppState('scenarios'); }}
             />
           )}
           {appState === 'daily-practice' && (
@@ -856,33 +895,22 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
 
   // Timer logic
   useEffect(() => {
-    if (hasStarted && timeLeft > 0 && !isFinished) {
+    if (hasStarted && timeLeft > 0 && !isFinished && !isProcessing) {
       timerRef.current = setInterval(() => {
         setTimeLeft(prev => prev - 1);
       }, 1000);
     } else if (timeLeft === 0 && !isFinished) {
       setIsFinished(true);
+      onComplete({ scenario: scenarioId, topic: subTopic, messages });
     }
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [timeLeft, isFinished, hasStarted]);
+  }, [timeLeft, isFinished, hasStarted, isProcessing]);
 
   // Dynamic Topic Generation
   useEffect(() => {
     const initConversation = async () => {
-      // Check cache first
-      const cacheKey = `topic-${scenarioId}-${userLevel}`;
-      const cached = sessionStorage.getItem(cacheKey);
-      if (cached && refreshKey === 0) {
-        const data = JSON.parse(cached);
-        setSubTopic(data.subTopic);
-        setContext(data.context);
-        setOpeningLine(data.openingLine);
-        setIsProcessing(false);
-        return;
-      }
-
       setIsProcessing(true);
       try {
         const prompt = `Generate a UNIQUE and SPECIFIC sub-topic for English practice.
@@ -917,9 +945,6 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
         setSubTopic(finalData.subTopic);
         setContext(finalData.context);
         setOpeningLine(finalData.openingLine);
-        
-        // Save to cache
-        sessionStorage.setItem(cacheKey, JSON.stringify(finalData));
         
         setMessages([]); // Clear messages for new topic
         setHasStarted(false); // Reset start state
@@ -1092,6 +1117,7 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
 
   const handleFinish = () => {
     setIsFinished(true);
+    onComplete({ scenario: scenarioId, topic: subTopic, messages });
   };
 
   const formatTime = (seconds: number) => {
@@ -1310,69 +1336,8 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
         )}
 
         {isFinished && (
-          <motion.div
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-6 pb-8"
-          >
-            {/* Header card */}
-            <div className="p-8 bg-gradient-to-br from-indigo-600 to-indigo-800 text-white rounded-[2rem] text-center space-y-3">
-              <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto">
-                <Award size={32} />
-              </div>
-              <h3 className="text-2xl font-bold">Session Complete!</h3>
-              <p className="text-indigo-200 text-sm">You practiced for 5 minutes on <strong className="text-white">{subTopic || 'this scenario'}</strong></p>
-            </div>
-
-            {/* Stats row */}
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { label: 'Your turns', value: messages.filter(m => m.role === 'user').length },
-                { label: 'AI turns', value: messages.filter(m => m.role === 'ai').length },
-                { label: 'Avg IELTS', value: (() => {
-                  const scores = messages.filter(m => m.feedback?.score && m.feedback.score !== 'N/A').map(m => parseFloat(m.feedback.score));
-                  return scores.length ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1) : '—';
-                })() },
-              ].map(s => (
-                <div key={s.label} className="bg-white border border-slate-100 rounded-2xl p-4 text-center shadow-sm">
-                  <p className="text-2xl font-black text-indigo-600">{s.value}</p>
-                  <p className="text-[10px] text-slate-400 uppercase tracking-wider font-medium mt-1">{s.label}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Per-turn IELTS scores */}
-            {messages.some(m => m.feedback?.score && m.feedback.score !== 'N/A') && (
-              <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm space-y-3">
-                <p className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Your IELTS scores per turn</p>
-                {messages.filter(m => m.role === 'user' && m.feedback).map((m, i) => (
-                  <div key={i} className="space-y-1">
-                    <div className="flex justify-between items-center">
-                      <p className="text-xs text-slate-600 truncate max-w-[75%]">"{m.text}"</p>
-                      <span className={`text-xs font-black px-2 py-0.5 rounded ${parseFloat(m.feedback.score) >= 7 ? 'bg-emerald-100 text-emerald-700' : parseFloat(m.feedback.score) >= 5.5 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
-                        {m.feedback.score}
-                      </span>
-                    </div>
-                    {m.feedback.improved && (
-                      <p className="text-xs text-indigo-600 italic">→ "{m.feedback.improved}"</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* CTA buttons */}
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  onComplete({ scenario: scenarioId, topic: subTopic, messages });
-                  onBack();
-                }}
-                className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-colors"
-              >
-                Back to Scenarios
-              </button>
-            </div>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-8 text-center text-slate-400 text-sm">
+            Session ended — loading results…
           </motion.div>
         )}
       </div>
@@ -1380,31 +1345,35 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
       <footer className={`p-4 md:p-6 border-t border-slate-200 bg-white sticky bottom-0 transition-all duration-500 ${hasStarted ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'}`}>
         <div className="flex gap-3 items-center max-w-4xl mx-auto">
           <div className="flex-1 relative">
-            <textarea
-              rows={1}
-              value={userInput}
-              onChange={(e) => {
-                setUserInput(e.target.value);
-                e.target.style.height = 'auto';
-                e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
-              }}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-              placeholder={isFinished ? "Session ended" : isListening ? "Listening..." : "Type or use mic..."}
-              className={`w-full p-4 bg-slate-50 border rounded-2xl focus:outline-none transition-all text-sm resize-none overflow-hidden leading-relaxed ${isListening ? 'border-red-500 ring-4 ring-red-50' : 'border-slate-200 focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-50'}`}
-              disabled={isProcessing || isFinished}
-              style={{ minHeight: '52px', maxHeight: '120px' }}
-            />
-            {isListening && (
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 flex gap-1">
-                {[1, 2, 3].map(i => (
-                  <motion.div
-                    key={i}
-                    animate={{ height: [4, 12, 4] }}
-                    transition={{ repeat: Infinity, duration: 0.6, delay: i * 0.1 }}
-                    className="w-0.5 bg-red-500 rounded-full"
-                  />
-                ))}
+            {isListening ? (
+              <div className="w-full p-4 bg-red-50 border border-red-300 rounded-2xl flex items-center gap-3" style={{ minHeight: '52px' }}>
+                <div className="flex gap-1 items-end">
+                  {[1, 2, 3, 4].map(i => (
+                    <motion.div
+                      key={i}
+                      animate={{ height: [6, 18, 6] }}
+                      transition={{ repeat: Infinity, duration: 0.5, delay: i * 0.1 }}
+                      className="w-1 bg-red-500 rounded-full"
+                    />
+                  ))}
+                </div>
+                <span className="text-sm text-red-600 font-medium">Listening… tap mic to finish</span>
               </div>
+            ) : (
+              <textarea
+                rows={1}
+                value={userInput}
+                onChange={(e) => {
+                  setUserInput(e.target.value);
+                  e.target.style.height = 'auto';
+                  e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+                }}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                placeholder={isFinished ? "Session ended" : "Type your message or tap the mic…"}
+                className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-50 transition-all text-sm resize-none overflow-hidden leading-relaxed"
+                disabled={isProcessing || isFinished}
+                style={{ minHeight: '52px', maxHeight: '120px' }}
+              />
             )}
           </div>
           
@@ -2365,6 +2334,76 @@ function DailyVocab({ userLevel, onBack, onComplete }: { userLevel: ProficiencyL
   );
 }
 
+function ConversationResult({ data, onBack }: { data: any; onBack: () => void }) {
+  const userMsgs = (data.messages || []).filter((m: any) => m.role === 'user');
+  const scoredMsgs = userMsgs.filter((m: any) => m.feedback?.score && m.feedback.score !== 'N/A');
+  const scores = scoredMsgs.map((m: any) => parseFloat(m.feedback.score));
+  const avgScore = scores.length ? (scores.reduce((a: number, b: number) => a + b, 0) / scores.length).toFixed(1) : null;
+  const best = scores.length ? Math.max(...scores).toFixed(1) : null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+      className="max-w-2xl mx-auto px-6 pt-10 pb-24 space-y-6"
+    >
+      {/* Hero */}
+      <div className="bg-gradient-to-br from-indigo-600 to-violet-700 text-white rounded-[2rem] p-8 text-center space-y-2">
+        <div className="w-16 h-16 bg-white/15 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <Award size={32} />
+        </div>
+        <h2 className="text-3xl font-display font-black tracking-tighter">Session Complete!</h2>
+        <p className="text-indigo-200 text-sm">{data.topic || data.scenario}</p>
+      </div>
+
+      {/* Score tiles */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: 'Your turns', value: userMsgs.length, color: 'text-indigo-600' },
+          { label: 'Avg IELTS', value: avgScore ?? '—', color: avgScore && parseFloat(avgScore) >= 7 ? 'text-emerald-600' : avgScore ? 'text-amber-600' : 'text-slate-400' },
+          { label: 'Best score', value: best ?? '—', color: 'text-violet-600' },
+        ].map(s => (
+          <div key={s.label} className="bg-white border border-slate-100 rounded-2xl p-4 text-center shadow-sm">
+            <p className={`text-2xl font-black ${s.color}`}>{s.value}</p>
+            <p className="text-[10px] text-slate-400 uppercase tracking-wider font-medium mt-1">{s.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Per-turn breakdown */}
+      {scoredMsgs.length > 0 && (
+        <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm space-y-4">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Turn-by-turn feedback</p>
+          {scoredMsgs.map((m: any, i: number) => {
+            const band = parseFloat(m.feedback.score);
+            const bandColor = band >= 7 ? 'bg-emerald-100 text-emerald-700' : band >= 5.5 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500';
+            return (
+              <div key={i} className="space-y-1 pb-4 border-b border-slate-50 last:border-0 last:pb-0">
+                <div className="flex justify-between items-start gap-2">
+                  <p className="text-sm text-slate-700 leading-relaxed flex-1">"{m.text}"</p>
+                  <span className={`text-xs font-black px-2 py-0.5 rounded shrink-0 ${bandColor}`}>{m.feedback.score}</span>
+                </div>
+                {m.feedback.improved && m.feedback.improved !== m.text && (
+                  <p className="text-xs text-indigo-600 italic">✦ "{m.feedback.improved}"</p>
+                )}
+                {m.feedback.explanation && (
+                  <p className="text-xs text-slate-400 leading-relaxed">{m.feedback.explanation}</p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <button
+        onClick={onBack}
+        className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-colors shadow-lg"
+      >
+        Back to Practice Hub
+      </button>
+    </motion.div>
+  );
+}
+
 function Dashboard({ profile, onReset }: { profile: UserProfile, onReset: () => void, key?: string }) {
   const stats = [
     { 
@@ -2430,25 +2469,48 @@ function Dashboard({ profile, onReset }: { profile: UserProfile, onReset: () => 
         ))}
       </div>
 
-      <div className="p-10 bg-slate-900 rounded-[3rem] text-white relative overflow-hidden mb-12">
-        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
-          <div className="text-center md:text-left">
-            <h3 className="text-3xl font-display font-bold mb-2">Ready for more?</h3>
-            <p className="text-slate-400 max-w-sm">Consistency is the key to fluency. Complete one more session today to keep your streak alive.</p>
+      {/* Session History */}
+      <div className="mb-12">
+        <h2 className="text-2xl font-display font-black text-slate-900 mb-6 tracking-tighter">Recent Sessions</h2>
+        {(!profile.sessionHistory || profile.sessionHistory.length === 0) ? (
+          <div className="p-10 bg-white border border-slate-100 rounded-[2.5rem] text-center shadow-sm">
+            <p className="text-slate-400 text-sm">No sessions yet — complete your first session to see history here.</p>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="text-center">
-              <div className="text-4xl font-display font-black text-brand-400">7</div>
-              <div className="text-[10px] font-black uppercase tracking-widest text-slate-500">Day Streak</div>
-            </div>
-            <div className="w-px h-12 bg-slate-800" />
-            <div className="text-center">
-              <div className="text-4xl font-display font-black text-emerald-400">12</div>
-              <div className="text-[10px] font-black uppercase tracking-widest text-slate-500">Hours Practiced</div>
-            </div>
+        ) : (
+          <div className="space-y-3">
+            {profile.sessionHistory.slice(0, 10).map((s, i) => {
+              const date = new Date(s.date);
+              const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+              const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+              const typeLabel = s.sessionType === 'conversation' ? '💬 Conversation' : s.sessionType === 'impromptu' ? '🎙️ Impromptu' : '📚 Vocab';
+              const bandColor = s.avgScore && s.avgScore >= 7 ? 'text-emerald-600 bg-emerald-50' : s.avgScore && s.avgScore >= 5.5 ? 'text-amber-600 bg-amber-50' : 'text-slate-500 bg-slate-50';
+              return (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
+                  className="flex items-center gap-4 p-5 bg-white border border-slate-100 rounded-2xl shadow-sm"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-800 truncate">{s.topic || typeLabel}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">{typeLabel} · {dateStr} at {timeStr}</p>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    {s.turns > 0 && (
+                      <span className="text-xs text-slate-400">{s.turns} turns</span>
+                    )}
+                    {s.avgScore ? (
+                      <span className={`text-sm font-black px-3 py-1 rounded-xl ${bandColor}`}>
+                        {s.avgScore}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-slate-300 px-3 py-1 rounded-xl bg-slate-50">—</span>
+                    )}
+                  </div>
+                </motion.div>
+              );
+            })}
           </div>
-        </div>
-        <div className="absolute right-[-40px] top-[-40px] w-64 h-64 bg-brand-500/10 rounded-full blur-3xl" />
+        )}
       </div>
 
       <div className="flex justify-center pb-12">
