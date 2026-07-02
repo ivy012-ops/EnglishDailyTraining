@@ -195,6 +195,7 @@ export function ScoringGuide({ onBack }: Props) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {[
             { icon: '✅', text: '1 session is deducted when you complete a full session (reach the end)' },
+            { icon: '🔁', text: 'Regenerating a scenario topic also uses 1 session' },
             { icon: '✅', text: 'Counts for: AI Conversation, Impromptu Speech, and Word Builder' },
             { icon: '🚫', text: 'Going back early before finishing = no deduction' },
             { icon: '🔄', text: 'Free quota resets daily at midnight UTC (5 sessions / day)' },
