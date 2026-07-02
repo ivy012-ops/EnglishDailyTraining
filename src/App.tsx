@@ -272,7 +272,7 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-indigo-100">
       {/* Navigation Bar — show when logged in (even during onboarding so user can navigate away) */}
       {user && (
-        <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-6 py-3 flex justify-around items-center z-50 md:top-0 md:bottom-auto md:flex-col md:w-20 md:h-screen md:border-r md:border-t-0">
+        <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-6 py-3 flex justify-around items-center z-50 md:top-0 md:bottom-auto md:flex-col md:gap-6 md:pt-8 md:w-20 md:h-screen md:border-r md:border-t-0 md:justify-start">
           <NavIcon 
             active={appState === 'scenarios'} 
             onClick={() => setAppState('scenarios')} 
@@ -862,7 +862,6 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
       }, 1000);
     } else if (timeLeft === 0 && !isFinished) {
       setIsFinished(true);
-      onComplete();
     }
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -1093,11 +1092,6 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
 
   const handleFinish = () => {
     setIsFinished(true);
-    onComplete({
-      scenario: scenarioId,
-      topic: subTopic,
-      messages: messages
-    });
   };
 
   const formatTime = (seconds: number) => {
@@ -1316,22 +1310,69 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
         )}
 
         {isFinished && (
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
-            className="p-8 bg-indigo-900 text-white rounded-[2rem] text-center space-y-6"
+            className="space-y-6 pb-8"
           >
-            <div className="w-16 h-16 bg-indigo-800 rounded-2xl flex items-center justify-center mx-auto">
-              <Award size={32} />
+            {/* Header card */}
+            <div className="p-8 bg-gradient-to-br from-indigo-600 to-indigo-800 text-white rounded-[2rem] text-center space-y-3">
+              <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto">
+                <Award size={32} />
+              </div>
+              <h3 className="text-2xl font-bold">Session Complete!</h3>
+              <p className="text-indigo-200 text-sm">You practiced for 5 minutes on <strong className="text-white">{subTopic || 'this scenario'}</strong></p>
             </div>
-            <h3 className="text-2xl font-bold">Session Complete!</h3>
-            <p className="text-indigo-200">You've reached the 5-minute limit. Great job practicing today!</p>
-            <button 
-              onClick={onBack}
-              className="bg-white text-indigo-900 px-8 py-3 rounded-xl font-bold hover:bg-indigo-50 transition-colors"
-            >
-              Back to Scenarios
-            </button>
+
+            {/* Stats row */}
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: 'Your turns', value: messages.filter(m => m.role === 'user').length },
+                { label: 'AI turns', value: messages.filter(m => m.role === 'ai').length },
+                { label: 'Avg IELTS', value: (() => {
+                  const scores = messages.filter(m => m.feedback?.score && m.feedback.score !== 'N/A').map(m => parseFloat(m.feedback.score));
+                  return scores.length ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1) : '—';
+                })() },
+              ].map(s => (
+                <div key={s.label} className="bg-white border border-slate-100 rounded-2xl p-4 text-center shadow-sm">
+                  <p className="text-2xl font-black text-indigo-600">{s.value}</p>
+                  <p className="text-[10px] text-slate-400 uppercase tracking-wider font-medium mt-1">{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Per-turn IELTS scores */}
+            {messages.some(m => m.feedback?.score && m.feedback.score !== 'N/A') && (
+              <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm space-y-3">
+                <p className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Your IELTS scores per turn</p>
+                {messages.filter(m => m.role === 'user' && m.feedback).map((m, i) => (
+                  <div key={i} className="space-y-1">
+                    <div className="flex justify-between items-center">
+                      <p className="text-xs text-slate-600 truncate max-w-[75%]">"{m.text}"</p>
+                      <span className={`text-xs font-black px-2 py-0.5 rounded ${parseFloat(m.feedback.score) >= 7 ? 'bg-emerald-100 text-emerald-700' : parseFloat(m.feedback.score) >= 5.5 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
+                        {m.feedback.score}
+                      </span>
+                    </div>
+                    {m.feedback.improved && (
+                      <p className="text-xs text-indigo-600 italic">→ "{m.feedback.improved}"</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* CTA buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  onComplete({ scenario: scenarioId, topic: subTopic, messages });
+                  onBack();
+                }}
+                className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-colors"
+              >
+                Back to Scenarios
+              </button>
+            </div>
           </motion.div>
         )}
       </div>
@@ -1339,14 +1380,19 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
       <footer className={`p-4 md:p-6 border-t border-slate-200 bg-white sticky bottom-0 transition-all duration-500 ${hasStarted ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'}`}>
         <div className="flex gap-3 items-center max-w-4xl mx-auto">
           <div className="flex-1 relative">
-            <input 
-              type="text"
+            <textarea
+              rows={1}
               value={userInput}
-              onChange={(e) => setUserInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+              onChange={(e) => {
+                setUserInput(e.target.value);
+                e.target.style.height = 'auto';
+                e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+              }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
               placeholder={isFinished ? "Session ended" : isListening ? "Listening..." : "Type or use mic..."}
-              className={`w-full p-4 bg-slate-50 border rounded-2xl focus:outline-none transition-all text-sm ${isListening ? 'border-red-500 ring-4 ring-red-50' : 'border-slate-200 focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-50'}`}
+              className={`w-full p-4 bg-slate-50 border rounded-2xl focus:outline-none transition-all text-sm resize-none overflow-hidden leading-relaxed ${isListening ? 'border-red-500 ring-4 ring-red-50' : 'border-slate-200 focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-50'}`}
               disabled={isProcessing || isFinished}
+              style={{ minHeight: '52px', maxHeight: '120px' }}
             />
             {isListening && (
               <div className="absolute right-4 top-1/2 -translate-y-1/2 flex gap-1">
