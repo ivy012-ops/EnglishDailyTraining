@@ -85,6 +85,7 @@ interface UserProfile {
 export default function App() {
   const [appState, setAppState] = useState<AppState>('onboarding');
   const [selectedScenario, setSelectedScenario] = useState<string | null>(null);
+  const [conversationSessionKey, setConversationSessionKey] = React.useState(0);
   const [user, setUser] = useState<User | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -392,6 +393,7 @@ export default function App() {
                   }
                 }
                 setSelectedScenario(id);
+                setConversationSessionKey(k => k + 1);
                 setAppState('conversation');
               }}
               onDailyPractice={async () => {
@@ -420,9 +422,10 @@ export default function App() {
           )}
           {appState === 'conversation' && (
             <Conversation
-              key={`conversation-${selectedScenario}`}
+              key={`conversation-${selectedScenario}-${conversationSessionKey}`}
               userLevel={userProfile.level}
               scenarioId={selectedScenario}
+              userId={user?.uid ?? null}
               onBack={() => setAppState('scenarios')}
               onComplete={async (data) => {
                 setConversationResult(data);
@@ -878,7 +881,7 @@ function ScenarioSelection({ userLevel, userId, quotaRemaining, quotaIsPaid, onS
   );
 }
 
-function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel: ProficiencyLevel, scenarioId: string | null, onBack: () => void, onComplete: (data?: any) => void, key?: string }) {
+function Conversation({ userLevel, scenarioId, userId, onBack, onComplete }: { userLevel: ProficiencyLevel, scenarioId: string | null, userId: string | null, onBack: () => void, onComplete: (data?: any) => void, key?: string }) {
   const [messages, setMessages] = useState<{ role: 'ai' | 'user', text: string, feedback?: any }[]>([]);
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -1082,25 +1085,21 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
       setUserInput("");
     } catch (error: any) {
       console.error("AI Error:", error);
-      
-      let errorMessage = "I'm having a little trouble connecting to my linguistic analysis engine, but I'm still listening!";
-      let fallbackResponse = "That's a great point! Could you expand on that a little more?";
-      
+
       if (error.message?.includes("quota") || error.message?.includes("429")) {
-        errorMessage = "Daily AI quota exceeded. I can still chat a bit, but I won't be able to provide detailed IELTS feedback until tomorrow.";
-        fallbackResponse = "I've reached my daily limit for deep analysis, but I'm still here to chat! What else is on your mind?";
+        // Quota hit mid-session → end immediately and go to results
+        setMessages(prev => [...prev, { role: 'user', text, feedback: { score: 'N/A', improved: text, explanation: '' } }]);
+        setUserInput("");
+        setIsFinished(true);
+        onComplete({ scenario: scenarioId, topic: subTopic, messages: [...messages, { role: 'user', text }], quotaHit: true });
+        return;
       }
 
-      const fallbackFeedback = {
-        original: text,
-        improved: text, 
-        explanation: errorMessage,
-        score: "N/A"
-      };
+      // Generic connection error — show inline notice, don't kill session
       setMessages(prev => [
-        ...prev, 
-        { role: 'user', text, feedback: fallbackFeedback },
-        { role: 'ai', text: fallbackResponse }
+        ...prev,
+        { role: 'user', text, feedback: { score: 'N/A', improved: text, explanation: 'Could not analyse this response — connection issue.' } },
+        { role: 'ai', text: "Sorry, I had trouble processing that. Could you try again?" }
       ]);
       setUserInput("");
     } finally {
@@ -1165,11 +1164,16 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
           >
             Finish
           </button>
-          <button 
-            onClick={() => setRefreshKey(prev => prev + 1)}
+          <button
+            onClick={async () => {
+              if (userId) {
+                try { await quotaService.consumeQuota(userId, 'conversation'); } catch {}
+              }
+              setRefreshKey(prev => prev + 1);
+            }}
             disabled={isProcessing || messages.length > 1}
             className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all disabled:opacity-0"
-            title="Regenerate Topic"
+            title="Regenerate Topic (uses 1 session)"
           >
             <RefreshCw size={20} className={isProcessing ? 'animate-spin' : ''} />
           </button>
@@ -1216,12 +1220,18 @@ function Conversation({ userLevel, scenarioId, onBack, onComplete }: { userLevel
                     <div className="flex items-center gap-2 text-brand-600 font-bold text-[10px] uppercase tracking-[0.2em]">
                       <BookOpen size={14} /> Mission Briefing
                     </div>
-                    <button 
-                      onClick={() => setRefreshKey(prev => prev + 1)}
+                    <button
+                      onClick={async () => {
+                        if (userId) {
+                          try { await quotaService.consumeQuota(userId, 'conversation'); } catch {}
+                        }
+                        setRefreshKey(prev => prev + 1);
+                      }}
                       disabled={isProcessing}
                       className="flex items-center gap-2 text-[10px] font-bold text-slate-400 hover:text-brand-600 transition-colors uppercase tracking-widest disabled:opacity-50"
+                      title="Uses 1 session"
                     >
-                      <RefreshCw size={12} className={isProcessing ? 'animate-spin' : ''} /> New Topic
+                      <RefreshCw size={12} className={isProcessing ? 'animate-spin' : ''} /> New Topic (1 session)
                     </button>
                   </div>
                   
@@ -2334,7 +2344,7 @@ function DailyVocab({ userLevel, onBack, onComplete }: { userLevel: ProficiencyL
   );
 }
 
-function ConversationResult({ data, onBack }: { data: any; onBack: () => void }) {
+function ConversationResult({ data, onBack }: { data: any; onBack: () => void; key?: string }) {
   const userMsgs = (data.messages || []).filter((m: any) => m.role === 'user');
   const scoredMsgs = userMsgs.filter((m: any) => m.feedback?.score && m.feedback.score !== 'N/A');
   const scores = scoredMsgs.map((m: any) => parseFloat(m.feedback.score));
@@ -2346,6 +2356,17 @@ function ConversationResult({ data, onBack }: { data: any; onBack: () => void })
       initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
       className="max-w-2xl mx-auto px-6 pt-10 pb-24 space-y-6"
     >
+      {/* Quota-hit banner */}
+      {data.quotaHit && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 flex items-start gap-3">
+          <span className="text-xl">⚠️</span>
+          <div>
+            <p className="text-sm font-bold text-amber-800">Daily AI limit reached</p>
+            <p className="text-xs text-amber-700 mt-0.5">Your session ended early because the free Gemini quota ran out. Results below are based on turns completed before the limit. Come back tomorrow for more analysis.</p>
+          </div>
+        </div>
+      )}
+
       {/* Hero */}
       <div className="bg-gradient-to-br from-indigo-600 to-violet-700 text-white rounded-[2rem] p-8 text-center space-y-2">
         <div className="w-16 h-16 bg-white/15 rounded-2xl flex items-center justify-center mx-auto mb-4">

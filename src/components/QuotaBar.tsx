@@ -27,6 +27,7 @@ function InfoTooltip() {
           <ul className="qb-info__list">
             <li>✅ 1 session deducted when you <strong>complete</strong> a session</li>
             <li>✅ Counts for: AI Conversation, Impromptu Speech, Word Builder</li>
+            <li>🔁 <strong>Regenerating a topic</strong> also uses 1 session</li>
             <li>🚫 Going back early = <strong>no deduction</strong></li>
             <li>🔄 Resets daily at <strong>midnight UTC</strong></li>
             <li>♾️ <strong>Pro/Premium</strong> users have unlimited sessions</li>
