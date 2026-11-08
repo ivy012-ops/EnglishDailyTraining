@@ -50,7 +50,7 @@ Context-aware vocabulary sessions tailored to your proficiency level. Learn word
 Start with a quick level assessment. The app tracks your progress and adjusts difficulty across B1, B2, and C1 levels.
 
 ### Usage Quota + Progress Bar
-Free users get 5 AI sessions per day with a visual quota bar that resets daily at midnight UTC.
+Each user gets 5 AI sessions per day with a visual quota bar that resets daily at midnight UTC.
 
 ---
 
@@ -114,19 +114,8 @@ src/
 
 ---
 
-## Pricing
-
-| Plan | Price | AI Sessions/Day |
-|---|---|---|
-| Free | $0 | 5 |
-| Pro | $9.99/month | Unlimited |
-| Premium | $99/year | Unlimited + exports |
-
----
-
 ## Roadmap
 
-- [ ] Stripe subscription integration
 - [ ] Pre-recorded scenarios (no API cost)
 - [ ] Session history + playback
 - [ ] Pronunciation scoring

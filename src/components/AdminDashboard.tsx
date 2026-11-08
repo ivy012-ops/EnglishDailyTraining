@@ -44,10 +44,6 @@ export function AdminDashboard({ user, onBack }: Props) {
   const todaySessions = sessionsByDay[todayUTC()] ?? 0;
   const maxBar = Math.max(...days.map(d => sessionsByDay[d] ?? 0), 1);
 
-  const conversionRate = stats && stats.totalUsers > 0
-    ? ((stats.paidUsers / stats.totalUsers) * 100).toFixed(1)
-    : '0.0';
-
   const estMonthlyCost = ((stats?.totalSessionsAllTime ?? 0) * 0.0022 / 30).toFixed(2);
 
   return (
@@ -90,9 +86,6 @@ export function AdminDashboard({ user, onBack }: Props) {
               { label: 'Total users', value: stats.totalUsers, color: '#3b82f6' },
               { label: 'Sessions today', value: todaySessions, color: '#8b5cf6' },
               { label: 'All-time sessions', value: stats.totalSessionsAllTime, color: '#10b981' },
-              { label: 'Paid users', value: stats.paidUsers, color: '#f59e0b' },
-              { label: 'Free users', value: stats.freeUsers, color: '#64748b' },
-              { label: 'Conversion %', value: `${conversionRate}%`, color: '#ec4899' },
             ].map(card => (
               <div key={card.label} style={{ background: '#f8fafc', borderRadius: 16, padding: '18px 20px', border: '1px solid #e2e8f0' }}>
                 <p style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94a3b8', margin: '0 0 8px' }}>{card.label}</p>
@@ -120,30 +113,13 @@ export function AdminDashboard({ user, onBack }: Props) {
             </div>
           </div>
 
-          {/* Cost estimate + plan split */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+          {/* Cost estimate */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, marginBottom: 20 }}>
             <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 20, padding: '22px 24px' }}>
               <p style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginBottom: 16 }}>Estimated API cost</p>
               <p style={{ fontSize: 32, fontWeight: 700, color: '#10b981', margin: '0 0 4px', letterSpacing: '-0.02em' }}>${estMonthlyCost}</p>
               <p style={{ fontSize: 12, color: '#94a3b8', margin: 0 }}>per month at current pace</p>
               <p style={{ fontSize: 11, color: '#cbd5e1', margin: '10px 0 0', lineHeight: 1.5 }}>Based on $0.0022/session avg × sessions/day × 30</p>
-            </div>
-            <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 20, padding: '22px 24px' }}>
-              <p style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginBottom: 16 }}>Plan split</p>
-              {stats.totalUsers > 0 ? (
-                <>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
-                    <div style={{ flex: stats.freeUsers, background: '#e2e8f0', height: 10, borderRadius: 100 }} />
-                    <div style={{ flex: stats.paidUsers, background: '#f59e0b', height: 10, borderRadius: 100, minWidth: stats.paidUsers > 0 ? 8 : 0 }} />
-                  </div>
-                  <div style={{ display: 'flex', gap: 16, fontSize: 12 }}>
-                    <span style={{ color: '#64748b' }}>⬜ Free: {stats.freeUsers}</span>
-                    <span style={{ color: '#d97706' }}>🟡 Paid: {stats.paidUsers}</span>
-                  </div>
-                </>
-              ) : (
-                <p style={{ color: '#94a3b8', fontSize: 13 }}>No users yet</p>
-              )}
             </div>
           </div>
 

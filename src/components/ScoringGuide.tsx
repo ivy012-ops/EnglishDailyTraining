@@ -198,8 +198,7 @@ export function ScoringGuide({ onBack }: Props) {
             { icon: '🔁', text: 'Regenerating a scenario topic also uses 1 session' },
             { icon: '✅', text: 'Counts for: AI Conversation, Impromptu Speech, and Word Builder' },
             { icon: '🚫', text: 'Going back early before finishing = no deduction' },
-            { icon: '🔄', text: 'Free quota resets daily at midnight UTC (5 sessions / day)' },
-            { icon: '♾️', text: 'Pro / Premium users have unlimited sessions — no daily cap' },
+            { icon: '🔄', text: 'Daily quota resets at midnight UTC (5 sessions / day)' },
           ].map(row => (
             <div key={row.text} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
               <span style={{ fontSize: 16, lineHeight: 1.4 }}>{row.icon}</span>

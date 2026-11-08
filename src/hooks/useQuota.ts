@@ -6,7 +6,6 @@ export interface UseQuotaReturn {
   quota: UserQuota | null;
   canStart: boolean;
   remaining: number;
-  isPaid: boolean;
   loading: boolean;
   error: string | null;
   checkQuota: () => Promise<boolean>;
@@ -17,7 +16,6 @@ export function useQuota(userId: string | null): UseQuotaReturn {
   const [quota, setQuota]         = useState<UserQuota | null>(null);
   const [canStart, setCanStart]   = useState(true);
   const [remaining, setRemaining] = useState(5);
-  const [isPaid, setIsPaid]       = useState(false);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState<string | null>(null);
 
@@ -36,7 +34,6 @@ export function useQuota(userId: string | null): UseQuotaReturn {
       setQuota(q);
       setCanStart(result.allowed);
       setRemaining(result.remainingToday);
-      setIsPaid(q?.plan !== 'free');
 
       return result.allowed;
     } catch (err) {
@@ -65,5 +62,5 @@ export function useQuota(userId: string | null): UseQuotaReturn {
     [userId, checkQuota]
   );
 
-  return { quota, canStart, remaining, isPaid, loading, error, checkQuota, consumeQuota };
+  return { quota, canStart, remaining, loading, error, checkQuota, consumeQuota };
 }
