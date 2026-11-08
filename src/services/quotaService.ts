@@ -14,7 +14,6 @@ const STATS_DOC = doc(db, '_platform', 'stats');
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type Plan = 'free' | 'pro' | 'premium';
 export type SessionType =
   | 'conversation'
   | 'impromptu'
@@ -23,19 +22,14 @@ export type SessionType =
 
 export interface UserQuota {
   userId: string;
-  plan: Plan;
 
   // Daily quota (AI sessions)
-  dailyLimit: number;       // 5 free | Number.MAX_SAFE_INTEGER paid
+  dailyLimit: number;       // sessions allowed per day
   dailyUsed: number;        // sessions consumed today
   lastResetDate: string;    // YYYY-MM-DD (UTC)
 
   // Lifetime stats
   totalSessionsAllTime: number;
-
-  // Subscription
-  subscriptionStatus: 'active' | 'cancelled' | 'expired';
-  subscriptionEndDate?: string; // ISO string
 
   // Timestamps
   lastSessionDate: string;  // ISO string
@@ -45,20 +39,18 @@ export interface UserQuota {
 export interface PlatformStats {
   totalUsers: number;
   totalSessionsAllTime: number;
-  freeUsers: number;
-  paidUsers: number;
   sessionsByDay: Record<string, number>;
 }
 
 export interface QuotaCheckResult {
   allowed: boolean;
   reason?: string;
-  remainingToday: number;   // Infinity for paid users
+  remainingToday: number;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const FREE_DAILY_LIMIT = 5;
+const DAILY_LIMIT = 5;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -97,14 +89,9 @@ class QuotaService {
   async canStartSession(userId: string): Promise<QuotaCheckResult> {
     let quota = await this.getUserQuota(userId);
 
-    // First-time user — create free quota automatically
+    // First-time user — create their quota automatically
     if (!quota) {
-      quota = await this._createFreeQuota(userId);
-    }
-
-    // Paid plans: unlimited
-    if (quota.plan !== 'free') {
-      return { allowed: true, remainingToday: Infinity };
+      quota = await this._createQuota(userId);
     }
 
     const remaining = quota.dailyLimit - quota.dailyUsed;
@@ -112,7 +99,7 @@ class QuotaService {
     if (remaining <= 0) {
       return {
         allowed: false,
-        reason: `You've used all ${quota.dailyLimit} free sessions today. Come back tomorrow or upgrade to Pro!`,
+        reason: `You've used all ${quota.dailyLimit} sessions today. Come back tomorrow!`,
         remainingToday: 0,
       };
     }
@@ -150,32 +137,6 @@ class QuotaService {
     }
   }
 
-  // ── Upgrade / Downgrade ───────────────────────────────────────────────────
-
-  async upgradeToPaid(
-    userId: string,
-    plan: 'pro' | 'premium',
-    endDate: Date
-  ): Promise<void> {
-    await updateDoc(doc(db, 'quotas', userId), {
-      plan,
-      subscriptionStatus: 'active',
-      subscriptionEndDate: endDate.toISOString(),
-      dailyLimit: Number.MAX_SAFE_INTEGER,
-    });
-    await setDoc(STATS_DOC, { freeUsers: increment(-1), paidUsers: increment(1) }, { merge: true }).catch(() => {});
-  }
-
-  async downgradeToFree(userId: string): Promise<void> {
-    await updateDoc(doc(db, 'quotas', userId), {
-      plan: 'free',
-      subscriptionStatus: 'expired',
-      dailyLimit: FREE_DAILY_LIMIT,
-      subscriptionEndDate: null,
-    });
-    await setDoc(STATS_DOC, { freeUsers: increment(1), paidUsers: increment(-1) }, { merge: true }).catch(() => {});
-  }
-
   async getPlatformStats(): Promise<PlatformStats | null> {
     try {
       const snap = await getDoc(STATS_DOC);
@@ -190,14 +151,13 @@ class QuotaService {
   async seedPlatformStats(): Promise<PlatformStats | null> {
     try {
       const allQuotas = await getDocs(collection(db, 'quotas'));
-      let totalUsers = 0, totalSessionsAllTime = 0, freeUsers = 0, paidUsers = 0;
+      let totalUsers = 0, totalSessionsAllTime = 0;
       const sessionsByDay: Record<string, number> = {};
 
       allQuotas.forEach(d => {
         const q = d.data() as UserQuota;
         totalUsers++;
         totalSessionsAllTime += q.totalSessionsAllTime ?? 0;
-        if (q.plan === 'free') freeUsers++; else paidUsers++;
         // Attribute all-time sessions to last session date as best approximation
         if (q.lastSessionDate) {
           const day = q.lastSessionDate.split('T')[0];
@@ -205,7 +165,7 @@ class QuotaService {
         }
       });
 
-      const stats: PlatformStats = { totalUsers, totalSessionsAllTime, freeUsers, paidUsers, sessionsByDay };
+      const stats: PlatformStats = { totalUsers, totalSessionsAllTime, sessionsByDay };
       await setDoc(STATS_DOC, stats, { merge: true });
       return stats;
     } catch {
@@ -215,16 +175,14 @@ class QuotaService {
 
   // ── Private ───────────────────────────────────────────────────────────────
 
-  private async _createFreeQuota(userId: string): Promise<UserQuota> {
+  private async _createQuota(userId: string): Promise<UserQuota> {
     const now = new Date().toISOString();
     const quota: UserQuota = {
       userId,
-      plan: 'free',
-      dailyLimit: FREE_DAILY_LIMIT,
+      dailyLimit: DAILY_LIMIT,
       dailyUsed: 0,
       lastResetDate: todayUTC(),
       totalSessionsAllTime: 0,
-      subscriptionStatus: 'active',
       lastSessionDate: now,
       createdAt: now,
     };
@@ -233,8 +191,6 @@ class QuotaService {
     await setDoc(STATS_DOC, {
       totalUsers: increment(1),
       totalSessionsAllTime: increment(0),
-      freeUsers: increment(1),
-      paidUsers: increment(0),
     }, { merge: true }).catch(() => {});
     return quota;
   }

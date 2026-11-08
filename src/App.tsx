@@ -92,7 +92,6 @@ export default function App() {
   const [showLevelUp, setShowLevelUp] = useState<{from: ProficiencyLevel, to: ProficiencyLevel} | null>(null);
   // Quota state
   const [quotaRemaining, setQuotaRemaining] = React.useState<number>(5);
-  const [quotaIsPaid, setQuotaIsPaid] = React.useState(false);
   const [showQuotaModal, setShowQuotaModal] = React.useState(false);
 
   const [userProfile, setUserProfile] = useState<UserProfile>({
@@ -138,7 +137,6 @@ export default function App() {
           const q = await quotaService.getUserQuota(currentUser.uid);
           if (q) {
             setQuotaRemaining(Math.max(0, q.dailyLimit - q.dailyUsed));
-            setQuotaIsPaid(q.plan !== 'free');
           }
         } catch (e) { console.error('[Quota] load error', e); }
       }
@@ -383,9 +381,8 @@ export default function App() {
               userLevel={userProfile.level}
               userId={user?.uid ?? null}
               quotaRemaining={quotaRemaining}
-              quotaIsPaid={quotaIsPaid}
               onSelect={async (id) => {
-                if (user && !quotaIsPaid) {
+                if (user) {
                   const check = await quotaService.canStartSession(user.uid);
                   if (!check.allowed) {
                     setShowQuotaModal(true);
@@ -397,7 +394,7 @@ export default function App() {
                 setAppState('conversation');
               }}
               onDailyPractice={async () => {
-                if (user && !quotaIsPaid) {
+                if (user) {
                   const check = await quotaService.canStartSession(user.uid);
                   if (!check.allowed) {
                     setShowQuotaModal(true);
@@ -407,7 +404,7 @@ export default function App() {
                 setAppState('daily-practice');
               }}
               onDailyVocab={async () => {
-                if (user && !quotaIsPaid) {
+                if (user) {
                   const check = await quotaService.canStartSession(user.uid);
                   if (!check.allowed) {
                     setShowQuotaModal(true);
@@ -499,7 +496,7 @@ export default function App() {
             <div style={{ fontSize:40, marginBottom:12 }}>⏰</div>
             <h3 style={{ fontSize:20, fontWeight:700, color:'#0f172a', marginBottom:10 }}>Daily limit reached</h3>
             <p style={{ fontSize:14, color:'#64748b', lineHeight:1.6, marginBottom:20 }}>
-              You've used all 5 free sessions today.<br />Come back tomorrow for a fresh set, or upgrade to Pro for unlimited sessions.
+              You've used all 5 sessions today.<br />Come back tomorrow for a fresh set.
             </p>
             <div style={{ background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:12, padding:'12px 16px', marginBottom:20, fontSize:13, color:'#475569' }}>
               🔄 Resets at <strong>midnight UTC</strong>
@@ -779,7 +776,7 @@ function Onboarding({ onComplete, onLogin, user, error }: { onComplete: (level: 
   );
 }
 
-function ScenarioSelection({ userLevel, userId, quotaRemaining, quotaIsPaid, onSelect, onDailyPractice, onDailyVocab, onReset, onSettings }: { userLevel: ProficiencyLevel, userId: string | null, quotaRemaining: number, quotaIsPaid: boolean, onSelect: (id: string) => void, onDailyPractice: () => void, onDailyVocab: () => void, onReset: () => void, onSettings: () => void, key?: string }) {
+function ScenarioSelection({ userLevel, userId, quotaRemaining, onSelect, onDailyPractice, onDailyVocab, onReset, onSettings }: { userLevel: ProficiencyLevel, userId: string | null, quotaRemaining: number, onSelect: (id: string) => void, onDailyPractice: () => void, onDailyVocab: () => void, onReset: () => void, onSettings: () => void, key?: string }) {
   const scenarios = [
     { id: 'meeting', title: 'Work Meeting', icon: <MessageSquare />, description: 'Discuss project updates with your team.', level: 'B2' },
     { id: 'interview', title: 'Job Interview', icon: <Award />, description: 'Practice answering common interview questions.', level: 'B2' },
